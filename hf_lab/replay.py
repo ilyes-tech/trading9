@@ -741,6 +741,11 @@ def run_replay(
         ):
             # Le signal de la bougie précédente est exécuté
             # seulement à l'ouverture de la bougie actuelle.
+            # Une minute sans transaction ne prouve aucune exécution.
+            # Le signal de la minute précédente expire sans report.
+            if bar.trades <= 0:
+                pending = None
+
             if (
                 pending is not None
                 and open_trade is None
@@ -944,6 +949,10 @@ def run_replay(
             # Ne produit pas de signal sur la dernière bougie,
             # car aucune bougie suivante n'existe pour l'entrée.
             if bar_index >= len(bars) - 1:
+                continue
+
+            # Ne pas créer de signal sur une bougie sans échange.
+            if bar.trades <= 0:
                 continue
 
             # Une seule position par exécution de stratégie dans

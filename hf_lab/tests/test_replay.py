@@ -132,6 +132,32 @@ class ReplayEngineTests(
             ],
         )
 
+    def test_zero_trade_entry_bar_expires_signal(self) -> None:
+        bars = [make_bar(0), make_bar(1), make_bar(2)]
+        bars[1] = Bar(time=bars[1].time, open=100.0, high=100.0,
+                      low=100.0, close=100.0, volume=0.0, trades=0.0)
+        def strategy(history):
+            return ReplaySignal(strategy="ZERO_ENTRY", side="BUY",
+                                stop_distance=1.0, target_distance=1.0) if len(history) == 1 else None
+        with tempfile.TemporaryDirectory() as folder:
+            report = run_replay(symbol="BTCUSD", dataset="SYNTHETIC_ZERO_ENTRY",
+                                bars=bars, strategy=strategy,
+                                database_path=Path(folder) / "test.sqlite3")
+        self.assertEqual(len(report.trades), 0)
+
+    def test_zero_trade_signal_bar_is_ignored(self) -> None:
+        bars = [make_bar(0), make_bar(1), make_bar(2)]
+        bars[0] = Bar(time=bars[0].time, open=100.0, high=100.0,
+                      low=100.0, close=100.0, volume=0.0, trades=0.0)
+        def strategy(history):
+            return ReplaySignal(strategy="ZERO_SIGNAL", side="BUY",
+                                stop_distance=1.0, target_distance=1.0) if len(history) == 1 else None
+        with tempfile.TemporaryDirectory() as folder:
+            report = run_replay(symbol="BTCUSD", dataset="SYNTHETIC_ZERO_SIGNAL",
+                                bars=bars, strategy=strategy,
+                                database_path=Path(folder) / "test.sqlite3")
+        self.assertEqual(len(report.trades), 0)
+
     def test_entry_is_on_next_bar_and_sl_is_first(
         self,
     ) -> None:
