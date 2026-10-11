@@ -433,13 +433,16 @@ def load_bars(
                 )
             )
 
-    # Évite qu'un CSV mal ordonné donne accès à une chronologie
-    # incohérente. En cas de timestamp dupliqué, la dernière ligne
-    # du fichier est conservée.
-    deduplicated = {
-        bar.time: bar
-        for bar in rows
-    }
+    # Tri chronologique ; les collisions contradictoires sont refusées.
+    # Un doublon strictement identique est sans effet.
+    deduplicated: dict[datetime, Bar] = {}
+    for bar in rows:
+        previous = deduplicated.get(bar.time)
+        if previous is not None and previous != bar:
+            raise ValueError(
+                f"{source} : timestamp dupliqué contradictoire : {bar.time.isoformat()}"
+            )
+        deduplicated[bar.time] = bar
 
     bars = [
         deduplicated[timestamp]
