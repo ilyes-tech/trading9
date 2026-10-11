@@ -1,0 +1,36 @@
+# OMEGA — safe default: track only explicitly selected code and documentation
+*
+!.gitignore
+!OMEGA_MASTER_PLAN_V1.md
+!hf_lab/
+hf_lab/*
+!hf_lab/*.py
+!hf_lab/tests/
+hf_lab/tests/*
+!hf_lab/tests/*.py
+!research_agent_v57_quantum_searcher/
+research_agent_v57_quantum_searcher/*
+!research_agent_v57_quantum_searcher/src/
+research_agent_v57_quantum_searcher/src/*
+!research_agent_v57_quantum_searcher/tools/
+research_agent_v57_quantum_searcher/tools/*
+# Never version credentials, datasets, work state, or runtime artifacts
+**/.env
+**/.env.*
+**/*secret*
+**/*credential*
+**/*.pem
+**/*.key
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/*.sqlite*
+**/*.csv
+**/*.parquet
+**/*.zip
+**/*.json
+**/*.jsonl
+**/work/
+**/historical/
+**/database/
+**/.venv*/
