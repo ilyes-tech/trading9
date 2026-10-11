@@ -14,6 +14,7 @@ from hf_lab.replay import (
     Bar,
     ReplaySettings,
     ReplaySignal,
+    load_bars,
     run_replay,
 )
 
@@ -45,6 +46,29 @@ def make_bar(
         volume=1.0,
         trades=1.0,
     )
+
+
+class CsvIntegrityTests(unittest.TestCase):
+    def test_identical_timestamp_duplicate_is_idempotent(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "bars.csv"
+            header = "time,open,high,low,close\n"
+            rows = [f"2026-01-01T00:{i:02d}:00Z,100,101,99,100\n" for i in (0, 5, 10)]
+            path.write_text(header + "".join(rows) + rows[1])
+            bars = load_bars(path)
+            self.assertEqual(len(bars), 3)
+            self.assertEqual([bar.time.minute for bar in bars], [0, 5, 10])
+
+    def test_conflicting_timestamp_duplicate_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder) / "bars.csv"
+            path.write_text("time,open,high,low,close\n"
+                "2026-01-01T00:00:00Z,100,101,99,100\n"
+                "2026-01-01T00:05:00Z,100,101,99,100\n"
+                "2026-01-01T00:10:00Z,100,101,99,100\n"
+                "2026-01-01T00:05:00Z,100,105,99,104\n")
+            with self.assertRaisesRegex(ValueError, "contradictoire"):
+                load_bars(path)
 
 
 class ReplayEngineTests(
