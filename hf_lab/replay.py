@@ -91,7 +91,7 @@ class ReplaySignal:
                 "Distance du TP invalide."
             )
 
-        if not 0.0 <= self.confidence <= 1.0:
+        if not math.isfinite(self.confidence) or not 0.0 <= self.confidence <= 1.0:
             raise ValueError(
                 "Confiance hors intervalle 0–1."
             )

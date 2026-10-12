@@ -48,6 +48,14 @@ def make_bar(
     )
 
 
+class ReplaySignalFiniteConfidenceTests(unittest.TestCase):
+    def test_nonfinite_confidence_fails_closed(self) -> None:
+        for value in (float("nan"), float("inf"), -float("inf")):
+            with self.subTest(value=value):
+                with self.assertRaises(ValueError):
+                    ReplaySignal(strategy="TEST", side="BUY", stop_distance=1.0, target_distance=1.0, confidence=value).validate()
+
+
 class ReplaySettingsFiniteCostTests(unittest.TestCase):
     def test_nonfinite_costs_fail_closed(self) -> None:
         for field in ("fee_bps_per_side", "slippage_bps_per_side"):
