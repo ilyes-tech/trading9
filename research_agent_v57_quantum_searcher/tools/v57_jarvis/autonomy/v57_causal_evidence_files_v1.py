@@ -15,7 +15,10 @@ def check_file(filename, expected_hash):
     path = ROOT / filename
     if not path.is_file() or path.is_symlink():
         return 'DENY_MISSING_OR_LINK', None
-    raw = path.read_bytes()
+    try:
+        raw = path.read_bytes()
+    except OSError:
+        return "DENY_UNREADABLE", None
     if len(raw) > 2_000_000 or hashlib.sha256(raw).hexdigest() != expected_hash:
         return 'DENY_HASH_OR_SIZE', None
     try:
