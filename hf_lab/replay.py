@@ -730,6 +730,8 @@ def run_replay(
         prices = (bar.open, bar.high, bar.low, bar.close)
         if not all(math.isfinite(price) and price > 0 for price in prices):
             raise ValueError(f"Bougie {index} : prix invalide.")
+        if bar.high < max(bar.open, bar.close, bar.low) or bar.low > min(bar.open, bar.close, bar.high):
+            raise ValueError(f"Bougie {index} : OHLC incoherent.")
         if not math.isfinite(bar.volume) or bar.volume < 0 or not math.isfinite(bar.trades) or bar.trades < 0:
             raise ValueError(f"Bougie {index} : volume ou transactions invalides.")
 

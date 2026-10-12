@@ -54,6 +54,8 @@ class DirectReplayBarIntegrityTests(unittest.TestCase):
         baseline = [make_bar(i) for i in range(3)]
         cases = (
             (1, {"close": float("nan")}),
+            (1, {"high": 99.0}),
+            (1, {"low": 101.0}),
             (1, {"volume": -1.0}),
             (1, {"trades": float("inf")}),
             (1, {"time": baseline[0].time}),
@@ -311,6 +313,7 @@ class ReplayEngineTests(
             ),
             make_bar(
                 2,
+                high=101.5,
                 close=101.0,
             ),
         ]
@@ -386,6 +389,7 @@ class ReplayEngineTests(
             ),
             make_bar(
                 2,
+                high=101.5,
                 close=101.0,
             ),
         ]
