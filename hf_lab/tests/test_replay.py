@@ -48,6 +48,28 @@ def make_bar(
     )
 
 
+class DirectReplayBarIntegrityTests(unittest.TestCase):
+    def test_direct_replay_rejects_invalid_bars_before_database_creation(self) -> None:
+        from dataclasses import replace
+        baseline = [make_bar(i) for i in range(3)]
+        cases = (
+            (1, {"close": float("nan")}),
+            (1, {"volume": -1.0}),
+            (1, {"trades": float("inf")}),
+            (1, {"time": baseline[0].time}),
+            (1, {"time": datetime(2026, 1, 1)}),
+        )
+        for index, changes in cases:
+            with self.subTest(changes=changes):
+                bars = list(baseline)
+                bars[index] = replace(bars[index], **changes)
+                with tempfile.TemporaryDirectory() as folder:
+                    db = Path(folder) / "replay.sqlite3"
+                    with self.assertRaises(ValueError):
+                        run_replay(symbol="BTCUSD", dataset="INVALID", bars=bars, strategy=lambda _: None, database_path=db)
+                    self.assertFalse(db.exists())
+
+
 class ReplaySignalFiniteConfidenceTests(unittest.TestCase):
     def test_nonfinite_confidence_fails_closed(self) -> None:
         for value in (float("nan"), float("inf"), -float("inf")):

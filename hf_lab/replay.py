@@ -718,6 +718,21 @@ def run_replay(
             "Au moins trois bougies sont requises."
         )
 
+    # Refuser les donnees non finies et les timestamps invalides
+    # meme lorsque le moteur est appele sans passer par le CSV.
+    previous_time = None
+    for index, bar in enumerate(bars):
+        if bar.time.tzinfo is None or bar.time.utcoffset() is None:
+            raise ValueError(f"Bougie {index} : timestamp sans fuseau.")
+        if previous_time is not None and bar.time <= previous_time:
+            raise ValueError(f"Bougie {index} : chronologie non strictement croissante.")
+        previous_time = bar.time
+        prices = (bar.open, bar.high, bar.low, bar.close)
+        if not all(math.isfinite(price) and price > 0 for price in prices):
+            raise ValueError(f"Bougie {index} : prix invalide.")
+        if not math.isfinite(bar.volume) or bar.volume < 0 or not math.isfinite(bar.trades) or bar.trades < 0:
+            raise ValueError(f"Bougie {index} : volume ou transactions invalides.")
+
     normalized_symbol = str(
         symbol
     ).upper().strip()
