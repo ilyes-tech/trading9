@@ -1,0 +1,72 @@
+{
+  "cost_scenarios_are_assumptions_not_calibrated": true,
+  "dataset": "historical/kraken_micro_m1/extracted/BTCUSD_MICRO_2026_06_M1.csv",
+  "dataset_sha256": "ae990b40e3db55ae263b148ac6a45102e542b1f42e66424851ef735ebec9a526",
+  "decision": "REJECT_ON_TRAIN_ONLY",
+  "engine_source": "hf_lab/replay.py",
+  "holdout_used": false,
+  "kind": "OMEGA_TRAIN_ONLY_CANDIDATE_REJECTION",
+  "real_orders_allowed": false,
+  "reason": "negative net R and profit factor below 1 even at zero transaction costs; not an OOS finding",
+  "scenarios": [
+    {
+      "fee_bps_per_side": 0,
+      "fee_r": 0.0,
+      "gross_r": -155.090909,
+      "net_r": -155.090909,
+      "profit_factor": 0.80142,
+      "slippage_bps_per_side": 0,
+      "slippage_r": 0.0,
+      "trades": 1699
+    },
+    {
+      "fee_bps_per_side": 1,
+      "fee_r": 357.934563,
+      "gross_r": -155.090909,
+      "net_r": -513.025472,
+      "profit_factor": 0.458451,
+      "slippage_bps_per_side": 0,
+      "slippage_r": 0.0,
+      "trades": 1699
+    },
+    {
+      "fee_bps_per_side": 2,
+      "fee_r": 715.86913,
+      "gross_r": -155.090909,
+      "net_r": -1228.894602,
+      "profit_factor": 0.103418,
+      "slippage_bps_per_side": 1,
+      "slippage_r": 357.934563,
+      "trades": 1699
+    },
+    {
+      "fee_bps_per_side": 5,
+      "fee_r": 1789.672824,
+      "gross_r": -155.090909,
+      "net_r": -2302.698296,
+      "profit_factor": 0.008629,
+      "slippage_bps_per_side": 1,
+      "slippage_r": 357.934563,
+      "trades": 1699
+    },
+    {
+      "fee_bps_per_side": 10,
+      "fee_r": 3579.345679,
+      "gross_r": -155.090909,
+      "net_r": -4808.240278,
+      "profit_factor": 2.4e-05,
+      "slippage_bps_per_side": 3,
+      "slippage_r": 1073.80369,
+      "trades": 1699
+    }
+  ],
+  "schema_version": 1,
+  "scientific_admission": false,
+  "split": "chronological 60/20/20",
+  "strategy": "MOMENTUM_BURST",
+  "strategy_source": "hf_lab/strategies/candidates.py",
+  "train_bars": 25920,
+  "train_end": "2026-06-18T23:59:00+00:00",
+  "train_start": "2026-06-01T00:00:00+00:00",
+  "validation_used": false
+}
