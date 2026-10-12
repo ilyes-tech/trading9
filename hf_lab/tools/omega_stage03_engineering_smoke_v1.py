@@ -36,7 +36,7 @@ def synthetic_bars() -> list[Bar]:
     return rows
 
 
-def exercise(path: Path, bars: list[Bar]) -> tuple[str, int, int]:
+def exercise(path: Path, bars: list[Bar]) -> tuple[str, int, int, dict[str, float | int]]:
     report = run_replay(symbol="BTCUSD", dataset="SYNTHETIC_ENGINEERING_ONLY_V1",
                         bars=bars, strategy=momentum_burst, settings=SETTINGS,
                         database_path=path)
@@ -61,7 +61,25 @@ def exercise(path: Path, bars: list[Bar]) -> tuple[str, int, int]:
                    for k, v in row.items() if k not in ("trade_id", "signal_id")}
                   for row in rows]
     fingerprint = hashlib.sha256(json.dumps(normalized, sort_keys=True, allow_nan=False).encode()).hexdigest()
-    return fingerprint, len(rows), signals
+    diagnostic = asdict(report.metrics)
+    net_values = [row["net_r"] for row in rows]
+    gains = sum(max(0.0, value) for value in net_values)
+    losses = -sum(min(0.0, value) for value in net_values)
+    if losses <= 0 or not all(math.isfinite(float(value)) for value in diagnostic.values()):
+        raise RuntimeError("UNREPORTABLE_SYNTHETIC_METRICS")
+    equity, peak, drawdown = 0.0, 0.0, 0.0
+    for value in net_values:
+        equity += value
+        peak = max(peak, equity)
+        drawdown = max(drawdown, peak - equity)
+    if not (diagnostic["trades"] == len(rows)
+            and diagnostic["wins"] == sum(value > 0 for value in net_values)
+            and diagnostic["losses"] == sum(value <= 0 for value in net_values)
+            and math.isclose(diagnostic["net_r"], sum(net_values), abs_tol=1e-9)
+            and math.isclose(diagnostic["profit_factor"], gains / losses, abs_tol=1e-9)
+            and math.isclose(diagnostic["max_drawdown_r"], drawdown, abs_tol=1e-9)):
+        raise RuntimeError("SYNTHETIC_DIAGNOSTIC_MISMATCH")
+    return fingerprint, len(rows), signals, diagnostic
 
 
 def main() -> None:
@@ -87,6 +105,7 @@ def main() -> None:
                  market_label="BTCUSD_SIMULATED_NOT_OBSERVED",
                  bars=len(bars), closed_trades=a[1], signals=a[2],
                  replay_fingerprint_sha256=a[0], repeat_runs=2,
+                 synthetic_diagnostic_only_not_market_performance=a[3],
                  accounting="SYNTHETIC_CLOSED_TRADES_COST_ARITHMETIC_VERIFIED",
                  assumed_fee_bps_per_side=5.0, assumed_slippage_bps_per_side=1.0,
                  costs_empirically_calibrated=False,
@@ -96,7 +115,8 @@ def main() -> None:
                  real_orders_executed=False, execution_authorized=False,
                  research_execution_authorized=False, orders_allowed=False,
                  mt5_allowed=False, holdout_allowed=False, auto_promotion_allowed=False,
-                 decision="TECHNICAL_PIPELINE_VERIFIED_ONLY_SCIENTIFIC_STAGE03_NOT_COMPLETE")
+                 decision="TECHNICAL_PIPELINE_VERIFIED_ONLY_SCIENTIFIC_STAGE03_NOT_COMPLETE",
+                 scientific_decision="REJECT_ADMISSION_NO_REAL_MARKET_EVIDENCE")
     tmp = OUTPUT.with_suffix(".tmp")
     tmp.write_text(json.dumps(proof, sort_keys=True, indent=2) + "\n")
     tmp.replace(OUTPUT)

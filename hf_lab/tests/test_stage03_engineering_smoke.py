@@ -48,6 +48,14 @@ class Stage03SyntheticEngineeringTests(unittest.TestCase):
             self.assertEqual(proof["closed_trades"], 83)
             self.assertEqual(proof["repeat_runs"], 2)
             self.assertEqual(proof["status"], "ENGINEERING_PASS_SCIENTIFIC_ADMISSION_STILL_DENIED")
+            self.assertEqual(proof["scientific_decision"], "REJECT_ADMISSION_NO_REAL_MARKET_EVIDENCE")
+            self.assertEqual(proof["source"], "GENERATED_SYNTHETIC_BARS_NO_MARKET_DATA")
+            self.assertIs(proof["costs_empirically_calibrated"], False)
+            diagnostic = proof["synthetic_diagnostic_only_not_market_performance"]
+            self.assertEqual(diagnostic["trades"], proof["closed_trades"])
+            self.assertEqual(diagnostic["wins"] + diagnostic["losses"], 83)
+            self.assertGreaterEqual(diagnostic["max_drawdown_r"], 0.0)
+            self.assertTrue(all(isinstance(value, (int, float)) for value in diagnostic.values()))
             for key in ("scientific_candidate_admitted", "search_executed",
                         "real_orders_executed", "performance_on_real_markets_claimed",
                         "research_execution_authorized", "orders_allowed", "mt5_allowed",
