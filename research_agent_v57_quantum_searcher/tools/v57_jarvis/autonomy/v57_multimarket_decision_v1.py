@@ -19,9 +19,11 @@ def decide(inventory,queue,features,history,registry,feedback):
         q=by_queue[market];f=by_feature[market];h=by_history[market];fb=by_feedback[market]
         if not q['bar_data_present']:next_action='ACQUIRE_AND_VERIFY_MARKET_DATA'
         elif not f['bar_imbalance_feature_schema_supported']:next_action='VERIFY_REQUIRED_FEATURE_SCHEMA'
+        elif h.get('historical_trial_scope', 'HISTORY_UNAVAILABLE_OR_INVALID') == 'HISTORY_UNAVAILABLE_OR_INVALID':next_action='VERIFY_HISTORICAL_SEARCH_COVERAGE'
+        elif isinstance(h.get('historical_trial_count'), int) and not isinstance(h.get('historical_trial_count'), bool) and h['historical_trial_count'] > 0:next_action='REVIEW_PRIOR_FLOW_TRIALS_AND_MECHANISM_DIFFERENCE'
         elif not fb['source_backed_candidate_count']:next_action='FIND_INDEPENDENT_SOURCE_EVIDENCE'
         else:next_action='REVIEW_CAUSAL_NOVELTY_AND_MEASUREMENT'
-        rows.append({'market':market,'next_action':next_action,'exhausted_history_count':h['historical_exhausted_count'],'source_backed_candidate_count':fb['source_backed_candidate_count'],'admitted_hypotheses':0,'research_authorized':False,'execution_authorized':False})
+        rows.append({'market':market,'next_action':next_action,'historical_trial_count':h.get('historical_trial_count'),'historical_sixty_second_trial_count':h.get('historical_sixty_second_trial_count'),'historical_trial_scope':h.get('historical_trial_scope','HISTORY_UNAVAILABLE_OR_INVALID'),'exhausted_history_count':h['historical_exhausted_count'],'source_backed_candidate_count':fb['source_backed_candidate_count'],'admitted_hypotheses':0,'research_authorized':False,'execution_authorized':False})
     return {'kind':'V57_MULTIMARKET_RESEARCH_DECISION_V1','status':'BLOCKED_PENDING_SCIENTIFIC_EVIDENCE','policy':'PER_MARKET_EVIDENCE_GAPS_NO_ARBITRARY_PRIORITY','markets':rows,'market_count':7,'admitted_hypotheses':0,'search_executed':False,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False}
 def main():
     def load(name):return json.loads((S/name).read_text())

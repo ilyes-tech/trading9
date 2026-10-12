@@ -12,7 +12,15 @@ def build(registry,questions,history):
     for q in questions['questions']:
         symbol=q['market']
         records=[r for r in registry['records'] if r['market']==symbol]
-        rows.append({'market':symbol,'question_status':q['status'],'source_backed_candidate_count':sum(r['hypothesis_id'] is not None for r in records),'exhausted_history_count':bymarket[symbol]['historical_exhausted_count'],'historical_rejection_known':bool(bymarket[symbol]['historical_exhausted_count']),'out_of_sample_performance':None,'independent_replication':None,'causal_novelty_verified':False,'next_step':'VALIDATE_SOURCE_AND_NOVELTY' if q.get('hypothesis') else 'OBTAIN_FEATURE_COMPATIBLE_DATA','research_authorized':False,'execution_authorized':False})
+        h = bymarket[symbol]
+        trial_count = h.get('historical_trial_count')
+        next_step = 'VALIDATE_SOURCE_AND_NOVELTY' if q.get('hypothesis') else 'OBTAIN_FEATURE_COMPATIBLE_DATA'
+        if q.get('hypothesis'):
+            if h.get('historical_trial_scope', 'HISTORY_UNAVAILABLE_OR_INVALID') == 'HISTORY_UNAVAILABLE_OR_INVALID':
+                next_step = 'VERIFY_HISTORICAL_SEARCH_COVERAGE'
+            elif isinstance(trial_count, int) and not isinstance(trial_count, bool) and trial_count > 0:
+                next_step = 'REVIEW_PRIOR_FLOW_TRIALS_AND_MECHANISM_DIFFERENCE'
+        rows.append({'market':symbol,'question_status':q['status'],'source_backed_candidate_count':sum(r['hypothesis_id'] is not None for r in records),'exhausted_history_count':bymarket[symbol]['historical_exhausted_count'],'historical_rejection_known':bool(bymarket[symbol]['historical_exhausted_count']),'out_of_sample_performance':None,'independent_replication':None,'causal_novelty_verified':False,'historical_trial_count':trial_count,'historical_sixty_second_trial_count':h.get('historical_sixty_second_trial_count'),'historical_trial_scope':h.get('historical_trial_scope','HISTORY_UNAVAILABLE_OR_INVALID'),'next_step':next_step,'research_authorized':False,'execution_authorized':False})
     assert len(rows)==7 and len({x['market'] for x in rows})==7
     return {'kind':'V57_MULTIMARKET_RESEARCH_FEEDBACK_V1','status':'NO_VERIFIED_NEW_EXPERIMENTAL_FEEDBACK','markets':rows,'scores_fabricated':False,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False}
 
