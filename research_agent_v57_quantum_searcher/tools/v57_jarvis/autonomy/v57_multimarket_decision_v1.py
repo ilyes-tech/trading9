@@ -17,7 +17,9 @@ def decide(inventory,queue,features,history,registry,feedback):
     rows=[]
     for market in MARKETS:
         q=by_queue[market];f=by_feature[market];h=by_history[market];fb=by_feedback[market]
-        if not q['bar_data_present']:next_action='ACQUIRE_AND_VERIFY_MARKET_DATA'
+        if fb.get('scientific_review_status') == 'REJECTED_EXISTING_FAMILY' and fb.get('next_step') == 'STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS':
+            next_action='STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS'
+        elif not q['bar_data_present']:next_action='ACQUIRE_AND_VERIFY_MARKET_DATA'
         elif not f['bar_imbalance_feature_schema_supported']:next_action='VERIFY_REQUIRED_FEATURE_SCHEMA'
         elif h.get('historical_trial_scope', 'HISTORY_UNAVAILABLE_OR_INVALID') == 'HISTORY_UNAVAILABLE_OR_INVALID':next_action='VERIFY_HISTORICAL_SEARCH_COVERAGE'
         elif isinstance(h.get('historical_trial_count'), int) and not isinstance(h.get('historical_trial_count'), bool) and h['historical_trial_count'] > 0:next_action='REVIEW_PRIOR_FLOW_TRIALS_AND_MECHANISM_DIFFERENCE'

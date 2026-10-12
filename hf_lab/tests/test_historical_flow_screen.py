@@ -1,5 +1,6 @@
 """Synthetic history tests: no dataset, holdout, admission, or search execution."""
 import os
+import hashlib
 from pathlib import Path
 import runpy
 import tempfile
@@ -56,7 +57,7 @@ class HistoricalFlowScreenTests(unittest.TestCase):
         self.assertTrue(all(q['execution_authorized'] is False for q in questions['questions']))
         self.assertTrue(bymarket['BTCUSD']['history_overlap_not_ruled_out'])
 
-    def decision_chain(self, history):
+    def decision_chain(self, history, resolution=None):
         feedback_module = runpy.run_path(str(MODULES / 'v57_multimarket_research_feedback_v1.py'))
         decision_module = runpy.run_path(str(MODULES / 'v57_multimarket_decision_v1.py'))
         queue = {'kind':'V57_MULTIMARKET_RESEARCH_QUEUE_V1', 'execution_authorized':False, 'markets':[{'market':s,'bar_data_present':s in ('BTCUSD','LTCUSD')} for s in MARKETS]}
@@ -64,7 +65,7 @@ class HistoricalFlowScreenTests(unittest.TestCase):
         features = {'kind':'V57_MULTIMARKET_FEATURE_ELIGIBILITY_V1','execution_authorized':False,'markets':[{'market':s,'bar_imbalance_feature_schema_supported':s in ('BTCUSD','LTCUSD')} for s in MARKETS]}
         questions = Q['build'](features, review)
         registry = {'kind':'V57_MULTIMARKET_CANDIDATE_REGISTRY_V1','markets_covered':7,'execution_authorized':False,'records':[{'market':'BTCUSD','hypothesis_id':'fixture'}]}
-        feedback = feedback_module['build'](registry, questions, review)
+        feedback = feedback_module['build'](registry, questions, review, resolution)
         inventory = {'execution_authorized':False,'markets':[{'market':s} for s in MARKETS]}
         decision = decision_module['decide'](inventory,queue,features,review,registry,feedback)
         return feedback, decision
@@ -85,6 +86,31 @@ class HistoricalFlowScreenTests(unittest.TestCase):
                 self.assertIs(doc[key],False)
         self.assertEqual(decision['admitted_hypotheses'],0)
         self.assertIs(decision['search_executed'],False)
+
+    def test_review_resolution_stops_only_matching_flow_hypothesis(self):
+        history = self.parse(HEADER + ROW)
+        question = 'Does signed volume imbalance on a closed M1 bar predict the next M1 log return after chronological validation and realistic costs?'
+        fingerprint = hashlib.sha256(('BTCUSD|M1|SIGNED_VOLUME_IMBALANCE|NEXT_BAR_LOG_RETURN|' + question).encode()).hexdigest()
+        resolution = dict(kind='OMEGA_STAGE03_HYPOTHESIS_REVIEW_RESOLUTION_V1',
+                          status='REJECT_FOR_NEW_FAMILY_ADMISSION',
+                          causal_family_gate='DENY_EXISTING_OR_EXHAUSTED_FAMILY',
+                          native_family='volume', existing_hypothesis_id=fingerprint,
+                          historical_trials_in_registry=1,
+                          research_execution_authorized=False, orders_allowed=False,
+                          mt5_allowed=False, holdout_allowed=False)
+        feedback, decision = self.decision_chain(history, resolution)
+        fb = {x['market']:x for x in feedback['markets']}
+        dec = {x['market']:x for x in decision['markets']}
+        self.assertEqual(fb['BTCUSD']['scientific_review_status'], 'REJECTED_EXISTING_FAMILY')
+        self.assertEqual(dec['BTCUSD']['next_action'], 'STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS')
+        self.assertEqual(dec['LTCUSD']['next_action'], 'FIND_INDEPENDENT_SOURCE_EVIDENCE')
+        self.assertEqual(decision['admitted_hypotheses'], 0)
+        for name in ('existing_hypothesis_id', 'historical_trials_in_registry', 'orders_allowed'):
+            broken = dict(resolution)
+            broken[name] = {'existing_hypothesis_id':'bad', 'historical_trials_in_registry':2, 'orders_allowed':True}[name]
+            _, result = self.decision_chain(history, broken)
+            self.assertEqual(next(x for x in result['markets'] if x['market']=='BTCUSD')['next_action'],
+                             'REVIEW_PRIOR_FLOW_TRIALS_AND_MECHANISM_DIFFERENCE')
 
     def test_unavailable_history_routes_to_verification_not_novelty(self):
         feedback,decision = self.decision_chain(self.parse(HEADER))
