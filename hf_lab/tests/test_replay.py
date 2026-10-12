@@ -65,6 +65,22 @@ class ReplaySettingsFiniteCostTests(unittest.TestCase):
                         ReplaySettings(**{field: value}).validate()
 
 
+class CsvVolumeIntegrityTests(unittest.TestCase):
+    def test_negative_or_nonfinite_volume_and_trades_rejected(self) -> None:
+        for field in ("volume", "trades"):
+            for value in ("-1", "nan", "inf", "-inf"):
+                with self.subTest(field=field, value=value):
+                    with tempfile.TemporaryDirectory() as folder:
+                        path = Path(folder) / "bars.csv"
+                        rows = ["2026-01-01T00:00:00Z,100,101,99,100,1,1","2026-01-01T00:01:00Z,100,101,99,100,1,1","2026-01-01T00:02:00Z,100,101,99,100,1,1"]
+                        fields = rows[1].split(",")
+                        fields[5 if field == "volume" else 6] = value
+                        rows[1] = ",".join(fields)
+                        path.write_text("time,open,high,low,close,volume,trades\n" + "\n".join(rows) + "\n")
+                        with self.assertRaisesRegex(ValueError, "volume ou transactions invalides"):
+                            load_bars(path)
+
+
 class CsvIntegrityTests(unittest.TestCase):
     def test_identical_timestamp_duplicate_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as folder:

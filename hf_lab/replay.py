@@ -421,6 +421,16 @@ def load_bars(
                     f"{source}:{row_number} : low incohérent"
                 )
 
+            if (
+                not math.isfinite(volume)
+                or volume < 0
+                or not math.isfinite(trade_count)
+                or trade_count < 0
+            ):
+                raise ValueError(
+                    f"{source}:{row_number} : volume ou transactions invalides"
+                )
+
             rows.append(
                 Bar(
                     time=timestamp,
