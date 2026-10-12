@@ -240,11 +240,75 @@ def audit_temporal_separation(manifest):
         return result('HOLDOUT_OVERLAP_OR_EMBARGO')
     return result()
 
+
+def assess_replay_evidence(folds, settings, manifest):
+    """Compose arithmetic, declared chronology and robustness on supplied trades.
+
+    Returns are unlevered bps of raw entry notional, derived from checked R.
+    Supplied stress_net_bps is ignored. Settings describe the supplied replay;
+    neither stress calibration nor data provenance is authenticated here.
+    No file access, execution or admission occurs.
+    """
+    import math
+    from datetime import datetime, timezone
+    safe=dict(causal_novelty_proven=False,independent_replication_proven=False,
+              new_research_authorized=False,orders_allowed=False,mt5_allowed=False,
+              holdout_allowed=False,auto_promotion_allowed=False)
+    reports={}
+    def result(status,reason=None):
+        return dict(status=status,reason=reason,checks=reports,
+                    unresolved=['DATASET_AND_STRATEGY_PROVENANCE','TRUSTED_PREREGISTRATION',
+                                'HISTORICAL_USAGE_REGISTRY_COMPLETENESS','COST_STRESS_CALIBRATION',
+                                'CAUSAL_NOVELTY_AND_INDEPENDENT_REPLICATION'],
+                    return_basis='UNLEVERED_BPS_OF_RAW_ENTRY_NOTIONAL',**safe)
+    temporal=audit_temporal_separation(manifest);reports['temporal']=temporal
+    if temporal['status']!='TEMPORAL_METADATA_VERIFIED_NOT_ADMITTED':
+        return result('REPLAY_EVIDENCE_REJECTED',temporal['reason'])
+    if not isinstance(settings,dict):
+        return result('REPLAY_EVIDENCE_REJECTED','MISSING_COST_SETTINGS')
+    if not isinstance(folds,list) or len(folds)!=3 or any(not isinstance(x,list) or not x for x in folds):
+        return result('REPLAY_EVIDENCE_REJECTED','THREE_NONEMPTY_FOLDS_REQUIRED')
+    if sum(map(len,folds))>100000:
+        return result('REPLAY_EVIDENCE_REJECTED','TRADE_BUDGET_EXCEEDED')
+    costs=audit_replay_costs([t for f in folds for t in f],settings.get('fee_bps_per_side'),settings.get('slippage_bps_per_side'))
+    reports['cost_arithmetic']=costs
+    if costs['status']!='COST_ARITHMETIC_VERIFIED_NOT_ADMITTED':
+        return result('REPLAY_EVIDENCE_REJECTED',costs['reason'])
+    def epoch(value):
+        if not isinstance(value,str):raise ValueError('TIMESTAMP_MUST_BE_ISO_STRING')
+        parsed=datetime.fromisoformat(value.replace('Z','+00:00'))
+        if parsed.tzinfo is None or parsed.utcoffset() is None or parsed.microsecond:
+            raise ValueError('AWARE_WHOLE_SECOND_TIMESTAMP_REQUIRED')
+        delta=parsed.astimezone(timezone.utc)-datetime(1970,1,1,tzinfo=timezone.utc)
+        return delta.days*86400+delta.seconds
+    normalized=[]
+    window=manifest['replication']
+    for fold in folds:
+        rows=[]
+        for trade in fold:
+            try:entry,exit_=epoch(trade.get('entry_time')),epoch(trade.get('exit_time'))
+            except (ValueError,TypeError,OverflowError):
+                return result('REPLAY_EVIDENCE_REJECTED','INVALID_NATIVE_TIMESTAMPS')
+            if not window['start']<=entry<exit_<window['end']:
+                return result('REPLAY_EVIDENCE_REJECTED','TRADE_OUTSIDE_REPLICATION_INFORMATION_INTERVAL')
+            # Relative price risk first avoids overflow from multiplying R by price.
+            risk_fraction=abs(trade['raw_entry_price']-trade['stop_price'])/trade['raw_entry_price']
+            bps=trade['net_r']*risk_fraction*10000
+            if not math.isfinite(bps):
+                return result('REPLAY_EVIDENCE_REJECTED','RETURN_CONVERSION_OVERFLOW')
+            rows.append(dict(entry_time=entry,exit_time=exit_,stress_net_bps=bps))
+        normalized.append(rows)
+    robustness=assess_trade_robustness(normalized,manifest['strategy_sha256'])
+    reports['robustness']=robustness
+    if robustness['status']!='ROBUSTNESS_PASS_NOT_ADMITTED':
+        return result('REPLAY_EVIDENCE_REJECTED',robustness.get('reason') or 'ROBUSTNESS_CRITERIA_FAILED')
+    return result('REPLAY_CHECKS_PASS_SCIENTIFIC_REVIEW_BLOCKED')
+
 def main():
  p=S/"multimarket_evidence_registry_v3.json";h=hashlib.sha256(p.read_bytes()).hexdigest()
  cases=[({"new_causal_evidence_verified":True},"DENY_SELF_ATTESTED"),({"evidence_file":"arbitrary_pass.json"},"DENY_UNTRUSTED_SOURCE"),({"evidence_file":p.name,"evidence_sha256":"0"*64},"DENY_HASH"),({"evidence_file":p.name,"evidence_sha256":h},"INTEGRITY_AND_SCHEMA_VERIFIED_NOT_CAUSAL_NOVELTY")]
  if any(verify(x)!=expected for x,expected in cases):raise RuntimeError("TESTS")
- doc={"schema_version":1,"kind":"V57_INDEPENDENT_EVIDENCE_VERIFIER_V2","status":"PASS","tests":len(cases),"allowlisted_sources":list(ALLOW),"source_sha256":h,"source_schema_checked":True,"trade_robustness_evaluation_supported":True,"trade_cost_arithmetic_supported":True,"temporal_metadata_checks_supported":True,"causal_novelty_proven":False,"new_research_authorized":False,"orders_allowed":False,"mt5_allowed":False,"holdout_allowed":False,"auto_promotion_allowed":False}
+ doc={"schema_version":1,"kind":"V57_INDEPENDENT_EVIDENCE_VERIFIER_V2","status":"PASS","tests":len(cases),"allowlisted_sources":list(ALLOW),"source_sha256":h,"source_schema_checked":True,"trade_robustness_evaluation_supported":True,"trade_cost_arithmetic_supported":True,"temporal_metadata_checks_supported":True,"composed_replay_review_supported":True,"causal_novelty_proven":False,"new_research_authorized":False,"orders_allowed":False,"mt5_allowed":False,"holdout_allowed":False,"auto_promotion_allowed":False}
  q=S/"independent_evidence_verifier_v2.tmp";q.write_text(json.dumps(doc,sort_keys=True,indent=2)+"\n");q.replace(S/"independent_evidence_verifier_v2.json")
  print("ALL PASS|INDEPENDENT_EVIDENCE_VERIFIER_V2|TESTS=4|ALLOWLIST=1|NOVELTY=NO")
 if __name__=="__main__":
