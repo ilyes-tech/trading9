@@ -112,11 +112,89 @@ def assess_trade_robustness(folds, strategy_id):
                                 min_positive_halves=4,max_trade_profit_share=0.35,max_day_profit_share=0.50),
                 scope='SUPPLIED_STRESSED_RETURNS_ONLY_NOT_COST_OR_PROVENANCE_OR_NOVELTY_VERIFICATION',**safe)
 
+
+def audit_replay_costs(trades, fee_bps_per_side, slippage_bps_per_side):
+    """Reconcile hf_lab TradeResult dictionaries; R units stay R units.
+
+    Arithmetic verification only; assumed costs are not calibrated market costs.
+    No conversion to the stressed-bps robustness contract is performed here.
+    """
+    import math
+    def finite(value):
+        if type(value) not in (int,float): return False
+        try: return math.isfinite(value)
+        except OverflowError: return False
+    def result(status, reason=None, count=0):
+        return dict(status=status,reason=reason,trades_checked=count,cost_realism_verified=False,
+                    independent_replication_proven=False,new_research_authorized=False,
+                    orders_allowed=False,mt5_allowed=False,holdout_allowed=False,auto_promotion_allowed=False)
+    if not all(finite(x) and 0 <= x < 10000 for x in (fee_bps_per_side,slippage_bps_per_side)):
+        return result('COST_REJECT','INVALID_COST_SETTINGS')
+    if not isinstance(trades,list) or not 1 <= len(trades) <= 100000:
+        return result('COST_REJECT','EMPTY_OR_OVERSIZE_TRADES')
+    price_keys=('raw_entry_price','entry_price','raw_exit_price','exit_price','stop_price')
+    metric_keys=('gross_r','fee_r','slippage_r','net_r')
+    for index,t in enumerate(trades):
+        if not isinstance(t,dict) or t.get('side') not in ('BUY','SELL'):
+            return result('COST_REJECT','INVALID_TRADE',index)
+        if not all(finite(t.get(k)) and t[k]>0 for k in price_keys) or not all(finite(t.get(k)) for k in metric_keys):
+            return result('COST_REJECT','INVALID_NUMERIC_FIELDS',index)
+        direction=1 if t['side']=='BUY' else -1
+        raw_entry,raw_exit=t['raw_entry_price'],t['raw_exit_price']
+        risk=direction*(raw_entry-t['stop_price'])
+        if risk<=0:return result('COST_REJECT','INVALID_RISK_DISTANCE',index)
+        entry=raw_entry*(1+direction*slippage_bps_per_side/10000)
+        exit_=raw_exit*(1-direction*slippage_bps_per_side/10000)
+        gross=direction*(raw_exit-raw_entry)/risk
+        fee=(entry+exit_)*fee_bps_per_side/10000/risk
+        slip=(abs(entry-raw_entry)+abs(exit_-raw_exit))/risk
+        expected=dict(entry_price=entry,exit_price=exit_,gross_r=gross,fee_r=fee,slippage_r=slip,net_r=gross-fee-slip)
+        if not all(finite(x) for x in expected.values()):
+            return result('COST_REJECT','ARITHMETIC_OVERFLOW',index)
+        for key,value in expected.items():
+            if not math.isclose(t[key],value,rel_tol=1e-10,abs_tol=1e-10):
+                return result('COST_REJECT','MISMATCH_'+key.upper(),index)
+    return result('COST_ARITHMETIC_VERIFIED_NOT_ADMITTED',count=len(trades))
+
+
+def audit_trade_evidence_file(candidate):
+    """Reuse bounded JSON/hash checking; bind a cost report to expected hashes.
+
+    Expected hashes must come from a separately reviewed manifest. This does not
+    prove dataset contents, preregistration, independent selection or causality.
+    """
+    import importlib.util
+    def reject(reason):
+        return dict(status='TRADE_EVIDENCE_REJECTED',reason=reason,new_research_authorized=False,
+                    independent_replication_proven=False,orders_allowed=False,mt5_allowed=False,
+                    holdout_allowed=False,auto_promotion_allowed=False)
+    if not isinstance(candidate,dict):return reject('MALFORMED_CANDIDATE')
+    for key in ('strategy_sha256','dataset_sha256'):
+        value=candidate.get(key)
+        if not isinstance(value,str) or len(value)!=64 or any(c not in '0123456789abcdef' for c in value):
+            return reject('INVALID_'+key.upper())
+    path=Path(__file__).with_name('v57_causal_evidence_files_v1.py')
+    spec=importlib.util.spec_from_file_location('_omega_evidence_files',path)
+    helper=importlib.util.module_from_spec(spec);spec.loader.exec_module(helper);helper.ROOT=S
+    status,doc=helper.check_file(candidate.get('evidence_file'),candidate.get('evidence_sha256'))
+    if status!='FILE_INTEGRITY_VERIFIED':return reject(status)
+    if doc.get('kind')!='V57_REPLAY_TRADE_COST_EVIDENCE_V1':return reject('INVALID_KIND')
+    for key in ('strategy_sha256','dataset_sha256'):
+        if doc.get(key)!=candidate[key]:return reject('MISMATCH_'+key.upper())
+    settings=doc.get('settings')
+    if not isinstance(settings,dict):return reject('MISSING_COST_SETTINGS')
+    audit=audit_replay_costs(doc.get('trades'),settings.get('fee_bps_per_side'),settings.get('slippage_bps_per_side'))
+    if audit['status']!='COST_ARITHMETIC_VERIFIED_NOT_ADMITTED':return reject(audit['reason'])
+    return dict(audit,status='FILE_AND_COST_ARITHMETIC_VERIFIED_NOT_ADMITTED',
+                evidence_sha256=candidate['evidence_sha256'],strategy_sha256=candidate['strategy_sha256'],
+                dataset_sha256=candidate['dataset_sha256'],dataset_contents_verified=False,
+                preregistration_verified=False,causal_novelty_proven=False)
+
 def main():
  p=S/"multimarket_evidence_registry_v3.json";h=hashlib.sha256(p.read_bytes()).hexdigest()
  cases=[({"new_causal_evidence_verified":True},"DENY_SELF_ATTESTED"),({"evidence_file":"arbitrary_pass.json"},"DENY_UNTRUSTED_SOURCE"),({"evidence_file":p.name,"evidence_sha256":"0"*64},"DENY_HASH"),({"evidence_file":p.name,"evidence_sha256":h},"INTEGRITY_AND_SCHEMA_VERIFIED_NOT_CAUSAL_NOVELTY")]
  if any(verify(x)!=expected for x,expected in cases):raise RuntimeError("TESTS")
- doc={"schema_version":1,"kind":"V57_INDEPENDENT_EVIDENCE_VERIFIER_V2","status":"PASS","tests":len(cases),"allowlisted_sources":list(ALLOW),"source_sha256":h,"source_schema_checked":True,"trade_robustness_evaluation_supported":True,"causal_novelty_proven":False,"new_research_authorized":False,"orders_allowed":False,"mt5_allowed":False,"holdout_allowed":False,"auto_promotion_allowed":False}
+ doc={"schema_version":1,"kind":"V57_INDEPENDENT_EVIDENCE_VERIFIER_V2","status":"PASS","tests":len(cases),"allowlisted_sources":list(ALLOW),"source_sha256":h,"source_schema_checked":True,"trade_robustness_evaluation_supported":True,"trade_cost_arithmetic_supported":True,"causal_novelty_proven":False,"new_research_authorized":False,"orders_allowed":False,"mt5_allowed":False,"holdout_allowed":False,"auto_promotion_allowed":False}
  q=S/"independent_evidence_verifier_v2.tmp";q.write_text(json.dumps(doc,sort_keys=True,indent=2)+"\n");q.replace(S/"independent_evidence_verifier_v2.json")
  print("ALL PASS|INDEPENDENT_EVIDENCE_VERIFIER_V2|TESTS=4|ALLOWLIST=1|NOVELTY=NO")
 if __name__=="__main__":
