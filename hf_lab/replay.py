@@ -132,12 +132,12 @@ class ReplaySettings:
                 "Le mode intrabar prudent est obligatoire."
             )
 
-        if self.fee_bps_per_side < 0:
+        if not math.isfinite(self.fee_bps_per_side) or self.fee_bps_per_side < 0:
             raise ValueError(
                 "Frais négatifs interdits."
             )
 
-        if self.slippage_bps_per_side < 0:
+        if not math.isfinite(self.slippage_bps_per_side) or self.slippage_bps_per_side < 0:
             raise ValueError(
                 "Slippage négatif interdit."
             )

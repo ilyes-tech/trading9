@@ -48,6 +48,15 @@ def make_bar(
     )
 
 
+class ReplaySettingsFiniteCostTests(unittest.TestCase):
+    def test_nonfinite_costs_fail_closed(self) -> None:
+        for field in ("fee_bps_per_side", "slippage_bps_per_side"):
+            for value in (float("nan"), float("inf"), -float("inf")):
+                with self.subTest(field=field, value=value):
+                    with self.assertRaises(ValueError):
+                        ReplaySettings(**{field: value}).validate()
+
+
 class CsvIntegrityTests(unittest.TestCase):
     def test_identical_timestamp_duplicate_is_idempotent(self) -> None:
         with tempfile.TemporaryDirectory() as folder:
