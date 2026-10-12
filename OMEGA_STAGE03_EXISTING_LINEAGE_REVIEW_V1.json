@@ -1,0 +1,95 @@
+{
+  "auto_promotion_allowed": false,
+  "backtest_executed": false,
+  "blockers": [
+    "SEALED_DATASET_BINDING_ABSENT",
+    "TRUSTED_TIMESTAMP_AND_ACCESS_HISTORY_NOT_VERIFIED",
+    "RAW_TRADE_COST_EVIDENCE_NOT_RECOVERED",
+    "INDEPENDENT_SCIENTIFIC_ACCEPTANCE_NOT_ESTABLISHED"
+  ],
+  "candidate_equal_across_manifests": true,
+  "candidate_id": "f912429efef6abe932726ec4162ff3f33bebc25515ebdb00f02afc6f639d555c",
+  "candidate_payload_hash_matches": true,
+  "candidate_payload_sha256": "81696ceb26bc89f3254915fd0e0b03a043405c2e5ba423ff6889e0941e6a6dcd",
+  "causal_novelty_proven": false,
+  "dataset_binding_status": "UNBOUND_SEALED_HOLDOUT",
+  "file_checks": [
+    {
+      "actual_sha256": "3fc84191be00b2513e02d55e4b212bc306eedf72730fc4febab97f4fa43bd0ab",
+      "expected_sha256": "3fc84191be00b2513e02d55e4b212bc306eedf72730fc4febab97f4fa43bd0ab",
+      "match": true,
+      "path": "research_agent_v57_quantum_searcher/config/V57_QUANTUM_SEARCHER_CONTRACT_V1.json"
+    },
+    {
+      "actual_sha256": "01174eb39943184a99e6fbaeaa44abda37b942040a4d055393d850ece016798f",
+      "expected_sha256": "01174eb39943184a99e6fbaeaa44abda37b942040a4d055393d850ece016798f",
+      "match": true,
+      "path": "research_agent_v57_quantum_searcher/config/V57_EFFECTIVE_SEARCH_SEMANTICS_V2.json"
+    },
+    {
+      "actual_sha256": "ea7cddd10285c8a5859a75af85a988986fa48d57d964fd48c670059b86270361",
+      "expected_sha256": "ea7cddd10285c8a5859a75af85a988986fa48d57d964fd48c670059b86270361",
+      "match": true,
+      "path": "research_agent_v57_quantum_searcher/config/V57_FINAL_NOMINATION_V2.json"
+    },
+    {
+      "actual_sha256": "b6c48fc932c989363ff57028a7cb99ad0f2b1bb2588cec491859d73a31ee8cdf",
+      "expected_sha256": "b6c48fc932c989363ff57028a7cb99ad0f2b1bb2588cec491859d73a31ee8cdf",
+      "match": true,
+      "path": "research_agent_v57_quantum_searcher/config/V57_SEARCH_UNIVERSE_V1.json"
+    },
+    {
+      "actual_sha256": "820497b91f92f87b2a8478fccb6d269c76e450ff2daa8de18f02293e78568c41",
+      "expected_sha256": "820497b91f92f87b2a8478fccb6d269c76e450ff2daa8de18f02293e78568c41",
+      "match": true,
+      "path": "research_agent_v57_quantum_searcher/src/v57_feature_resolver_v1.py"
+    },
+    {
+      "actual_sha256": "e273ae2ebe23073339800e32f01f0ade10f9b3a76a66dc32237d1af13a5a9bbb",
+      "expected_sha256": "e273ae2ebe23073339800e32f01f0ade10f9b3a76a66dc32237d1af13a5a9bbb",
+      "match": true,
+      "path": "research_agent_v57_quantum_searcher/src/v57_fold_signal_adapter_v1.py"
+    },
+    {
+      "actual_sha256": "ed0890d2d93e7b80a5aa8ffa939bac2653ddfcadee6349b53570563b56b4ddf7",
+      "expected_sha256": "ed0890d2d93e7b80a5aa8ffa939bac2653ddfcadee6349b53570563b56b4ddf7",
+      "match": true,
+      "path": "research_agent_v57_quantum_searcher/src/v57_replay_evaluator_v2.py"
+    },
+    {
+      "actual_sha256": "a60f074853e4c26f78d3d09d8c82c8c4e7e75297e212b9edd5b03f5ddbfc2e48",
+      "expected_sha256": "a60f074853e4c26f78d3d09d8c82c8c4e7e75297e212b9edd5b03f5ddbfc2e48",
+      "match": true,
+      "path": "research_agent_v57_quantum_searcher/src/v57_candidate_signal_engine_v1.py"
+    }
+  ],
+  "holdout_allowed": false,
+  "holdout_read": false,
+  "independent_replication_proven": false,
+  "kind": "OMEGA_STAGE03_EXISTING_LINEAGE_REVIEW_V1",
+  "market": "XAUUSD",
+  "mt5_allowed": false,
+  "next_action": "VERIFY_EXISTING_SEALED_DATASET_CATALOG_AND_ACCESS_LOG_METADATA_ONLY_BEFORE_CONSIDERING_ANY_HOLDOUT_EVALUATION",
+  "orders_allowed": false,
+  "preregistration_sha256": "d37f93f3cfe845369e53b827851e0d191f489d24ab31a943e27e10a9eb4e1905",
+  "raw_trade_evidence_recovered": false,
+  "reported_development": {
+    "pf_target_2_proven": false,
+    "recomputed": false,
+    "stress_pf_by_fold": [
+      1.089308186495405,
+      1.1034741773421017,
+      1.3048633757743373
+    ],
+    "trades": 217
+  },
+  "research_execution_authorized": false,
+  "reviewed_at_utc": "2026-10-12T18:10:43.484306+00:00",
+  "schema_version": 1,
+  "scope": "MANIFESTS_AND_SOURCE_CODE_ONLY",
+  "side": "SHORT",
+  "status": "INTEGRITY_PASS_SCIENTIFIC_AND_DATA_BINDING_BLOCKED",
+  "timeframe": "M15",
+  "trusted_registration_timestamp_verified": false,
+  "unseen_holdout_proven": false
+}
