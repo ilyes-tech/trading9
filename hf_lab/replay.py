@@ -626,6 +626,10 @@ def _trade_exit_on_bar(
     bar_index: int,
     settings: ReplaySettings,
 ) -> tuple[str, float] | None:
+    # Aucun prix executable ne peut etre deduit dune minute sans transaction.
+    if bar.trades <= 0:
+        return None
+
     side = trade.signal.side.upper()
 
     if side == "BUY":

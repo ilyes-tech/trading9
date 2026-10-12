@@ -406,3 +406,29 @@ class ReplayEngineTests(
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ZeroTradeExitTests(unittest.TestCase):
+    def test_max_hold_waits_for_traded_bar(self) -> None:
+        bars = [make_bar(i) for i in range(4)]
+        bars[2] = Bar(time=bars[2].time, open=100, high=100,
+                      low=100, close=100, volume=0, trades=0)
+
+        def strategy(history):
+            if len(history) == 1:
+                return ReplaySignal(strategy="ZERO_EXIT_GUARD", side="BUY",
+                                    stop_distance=100, target_distance=100)
+            return None
+
+        with tempfile.TemporaryDirectory() as folder:
+            report = run_replay(
+                symbol="BTCUSD", dataset="SYNTHETIC_ZERO_EXIT",
+                bars=bars, strategy=strategy,
+                settings=ReplaySettings(maximum_holding_bars=2,
+                                        fee_bps_per_side=0,
+                                        slippage_bps_per_side=0),
+                database_path=Path(folder) / "test.sqlite3",
+            )
+        self.assertEqual(len(report.trades), 1)
+        self.assertEqual(report.trades[0].result, "MAX_HOLD")
+        self.assertEqual(report.trades[0].exit_time, bars[3].time)
