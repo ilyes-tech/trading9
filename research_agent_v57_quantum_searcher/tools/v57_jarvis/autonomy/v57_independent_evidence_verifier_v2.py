@@ -190,11 +190,61 @@ def audit_trade_evidence_file(candidate):
                 dataset_sha256=candidate['dataset_sha256'],dataset_contents_verified=False,
                 preregistration_verified=False,causal_novelty_proven=False)
 
+
+def audit_temporal_separation(manifest):
+    """Check declared information intervals only; read no market data.
+
+    Intervals are half-open UTC epoch seconds and must include feature lookback,
+    labels and trade exits, not just entry times. Registry completeness and the
+    authenticity of registration timestamps require an external trusted record.
+    This structural check cannot establish independent replication.
+    """
+    def result(reason=None):
+        return dict(status='TEMPORAL_METADATA_REJECTED' if reason else 'TEMPORAL_METADATA_VERIFIED_NOT_ADMITTED',
+                    reason=reason,interval_convention='HALF_OPEN_INFORMATION_SUPPORT_UTC_SECONDS',
+                    dataset_contents_verified=False,registry_completeness_verified=False,
+                    preregistration_verified=False,independent_replication_proven=False,
+                    causal_novelty_proven=False,new_research_authorized=False,
+                    orders_allowed=False,mt5_allowed=False,holdout_allowed=False,auto_promotion_allowed=False)
+    def timestamp(x):
+        return type(x) is int and 0 <= x <= 253402300799
+    def interval(x):
+        return isinstance(x,dict) and timestamp(x.get('start')) and timestamp(x.get('end')) and x['start']<x['end']
+    if not isinstance(manifest,dict):return result('MALFORMED_MANIFEST')
+    if manifest.get('interval_basis')!='FULL_INFORMATION_SUPPORT':
+        return result('MISSING_INFORMATION_SUPPORT')
+    for key in ('strategy_sha256','dataset_sha256'):
+        value=manifest.get(key)
+        if not isinstance(value,str) or len(value)!=64 or any(c not in '0123456789abcdef' for c in value):
+            return result('INVALID_'+key.upper())
+    embargo=manifest.get('embargo_seconds')
+    if type(embargo) is not int or not 0<=embargo<=31536000:
+        return result('INVALID_EMBARGO')
+    used=manifest.get('previously_used')
+    holdout=manifest.get('reserved_holdout')
+    replication=manifest.get('replication')
+    if not isinstance(used,list) or not 1<=len(used)<=10000 or not all(interval(x) for x in used):
+        return result('INVALID_PRIOR_INTERVALS')
+    if not isinstance(holdout,list) or not 1<=len(holdout)<=10000 or not all(interval(x) for x in holdout):
+        return result('INVALID_HOLDOUT_INTERVALS')
+    if not interval(replication):return result('INVALID_REPLICATION_INTERVAL')
+    registered=manifest.get('registered_at')
+    first_access=manifest.get('first_replication_access_at')
+    if not timestamp(registered) or not timestamp(first_access) or not registered<first_access:
+        return result('REGISTRATION_NOT_BEFORE_ACCESS')
+    if first_access<replication['end']:
+        return result('ACCESS_BEFORE_COMPLETE_INTERVAL')
+    if replication['start']<max(x['end'] for x in used)+embargo:
+        return result('PRIOR_INFORMATION_OVERLAP_OR_EMBARGO')
+    if any(replication['start']<x['end']+embargo and x['start']<replication['end']+embargo for x in holdout):
+        return result('HOLDOUT_OVERLAP_OR_EMBARGO')
+    return result()
+
 def main():
  p=S/"multimarket_evidence_registry_v3.json";h=hashlib.sha256(p.read_bytes()).hexdigest()
  cases=[({"new_causal_evidence_verified":True},"DENY_SELF_ATTESTED"),({"evidence_file":"arbitrary_pass.json"},"DENY_UNTRUSTED_SOURCE"),({"evidence_file":p.name,"evidence_sha256":"0"*64},"DENY_HASH"),({"evidence_file":p.name,"evidence_sha256":h},"INTEGRITY_AND_SCHEMA_VERIFIED_NOT_CAUSAL_NOVELTY")]
  if any(verify(x)!=expected for x,expected in cases):raise RuntimeError("TESTS")
- doc={"schema_version":1,"kind":"V57_INDEPENDENT_EVIDENCE_VERIFIER_V2","status":"PASS","tests":len(cases),"allowlisted_sources":list(ALLOW),"source_sha256":h,"source_schema_checked":True,"trade_robustness_evaluation_supported":True,"trade_cost_arithmetic_supported":True,"causal_novelty_proven":False,"new_research_authorized":False,"orders_allowed":False,"mt5_allowed":False,"holdout_allowed":False,"auto_promotion_allowed":False}
+ doc={"schema_version":1,"kind":"V57_INDEPENDENT_EVIDENCE_VERIFIER_V2","status":"PASS","tests":len(cases),"allowlisted_sources":list(ALLOW),"source_sha256":h,"source_schema_checked":True,"trade_robustness_evaluation_supported":True,"trade_cost_arithmetic_supported":True,"temporal_metadata_checks_supported":True,"causal_novelty_proven":False,"new_research_authorized":False,"orders_allowed":False,"mt5_allowed":False,"holdout_allowed":False,"auto_promotion_allowed":False}
  q=S/"independent_evidence_verifier_v2.tmp";q.write_text(json.dumps(doc,sort_keys=True,indent=2)+"\n");q.replace(S/"independent_evidence_verifier_v2.json")
  print("ALL PASS|INDEPENDENT_EVIDENCE_VERIFIER_V2|TESTS=4|ALLOWLIST=1|NOVELTY=NO")
 if __name__=="__main__":
