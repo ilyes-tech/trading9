@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import math
 from typing import Generic, Sequence, TypeVar
 
 
@@ -25,6 +26,9 @@ def chronological_split(
     validation_ratio: float = 0.20,
     test_ratio: float = 0.20,
 ) -> ChronologicalSplit[Item]:
+    if not all(math.isfinite(ratio) for ratio in (train_ratio, validation_ratio, test_ratio)):
+        raise ValueError("Les ratios doivent être finis.")
+
     total_ratio = (
         train_ratio
         + validation_ratio
