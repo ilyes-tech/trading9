@@ -68,11 +68,60 @@
   "independent_replication_proven": false,
   "kind": "OMEGA_STAGE03_EXISTING_LINEAGE_REVIEW_V1",
   "market": "XAUUSD",
+  "metadata_catalog_review": {
+    "filename_keywords": [
+      "sealed",
+      "holdout",
+      "access_log",
+      "dataset_binding",
+      "data_catalog",
+      "data_manifest"
+    ],
+    "filename_search_roots": [
+      "research_agent_v57_quantum_searcher/config",
+      "research_agent_v57_quantum_searcher/work",
+      "/home/trading/.local/state/tradingai",
+      "repository_except_virtualenv_git_node_modules"
+    ],
+    "matching_xau_access_record_found": false,
+    "matching_xau_dataset_binding_found": false,
+    "matching_xau_preregistration_files": 1,
+    "reference_search": {
+      "extensions": [
+        ".py",
+        ".json",
+        ".md"
+      ],
+      "matches": [
+        "tools/v57_jarvis/registry/JARVIS_PROJECT_MAP_V1.json",
+        "config/V57_FINAL_NOMINATION_V2.json",
+        "config/V57_HOLDOUT_PREREGISTRATION_V1.json"
+      ],
+      "max_file_bytes": 250000,
+      "roots": [
+        "research_agent_v57_quantum_searcher/tools",
+        "research_agent_v57_quantum_searcher/src",
+        "research_agent_v57_quantum_searcher/config"
+      ]
+    },
+    "repository_filename_matches": 6,
+    "reviewed_at_utc": "2026-10-12T18:17:29.756300+00:00",
+    "scope_limit": "Filename discovery plus bounded code/config references; absence elsewhere is not established. No raw data or holdout results opened.",
+    "status": "BLOCKED_NO_MATCHING_DATASET_BINDING_OR_ACCESS_RECORD_FOUND",
+    "unrelated_holdout_artifacts_not_opened": [
+      "hf_lab/results/Q2_BTC_HOLDOUT.sha256",
+      "hf_lab/results/Q2_ETH_HOLDOUT.sha256",
+      "hf_lab/results/holdout_feedback_audit.txt",
+      "research_agent_v57_crypto_factory/config/V57_CRYPTO_PROSPECTIVE_HOLDOUT_PROTOCOL_V1.json",
+      "research_agent_v57_crypto_factory/config/V57_CRYPTO_PROSPECTIVE_HOLDOUT_PROTOCOL_V1.json.sha256"
+    ]
+  },
   "mt5_allowed": false,
-  "next_action": "VERIFY_EXISTING_SEALED_DATASET_CATALOG_AND_ACCESS_LOG_METADATA_ONLY_BEFORE_CONSIDERING_ANY_HOLDOUT_EVALUATION",
+  "next_action": "OBTAIN_EXISTING_XAU_DATASET_CUSTODIAN_MANIFEST_AND_ACCESS_HISTORY_OR_DESIGN_A_NEW_PROSPECTIVE_PROTOCOL_WITHOUT_RETROACTIVE_PREREGISTRATION",
   "orders_allowed": false,
   "preregistration_sha256": "d37f93f3cfe845369e53b827851e0d191f489d24ab31a943e27e10a9eb4e1905",
   "raw_trade_evidence_recovered": false,
+  "repeat_metadata_search_without_new_source": false,
   "reported_development": {
     "pf_target_2_proven": false,
     "recomputed": false,
@@ -83,6 +132,13 @@
     ],
     "trades": 217
   },
+  "required_external_evidence": [
+    "Dataset identifier, custodian and acquisition source",
+    "Exact UTC coverage and market/timeframe",
+    "Existing immutable content digest or signed provider manifest; do not read sealed data to invent historical proof",
+    "Access history or a prospective collection boundary establishing no prior strategy selection on these data",
+    "Binding to the frozen candidate and evaluation protocol before any evaluation"
+  ],
   "research_execution_authorized": false,
   "reviewed_at_utc": "2026-10-12T18:10:43.484306+00:00",
   "schema_version": 1,
