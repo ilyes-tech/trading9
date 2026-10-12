@@ -1028,6 +1028,10 @@ def run_replay(
             and selected_settings.force_close_at_end
         ):
             final_bar = bars[-1]
+            if final_bar.trades <= 0:
+                raise ValueError(
+                    "Cloture finale impossible : derniere bougie sans transaction."
+                )
 
             holding_bars = (
                 len(bars)

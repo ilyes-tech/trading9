@@ -432,3 +432,23 @@ class ZeroTradeExitTests(unittest.TestCase):
         self.assertEqual(len(report.trades), 1)
         self.assertEqual(report.trades[0].result, "MAX_HOLD")
         self.assertEqual(report.trades[0].exit_time, bars[3].time)
+
+    def test_end_of_data_zero_trade_bar_fails_closed(self) -> None:
+        bars = [make_bar(i) for i in range(3)]
+        bars[2] = Bar(time=bars[2].time, open=100, high=100,
+                      low=100, close=100, volume=0, trades=0)
+
+        def strategy(history):
+            if len(history) == 1:
+                return ReplaySignal(strategy="ZERO_FINAL", side="BUY",
+                                    stop_distance=100, target_distance=100)
+            return None
+
+        with tempfile.TemporaryDirectory() as folder:
+            with self.assertRaisesRegex(ValueError, "derniere bougie sans transaction"):
+                run_replay(
+                    symbol="BTCUSD", dataset="SYNTHETIC_ZERO_FINAL",
+                    bars=bars, strategy=strategy,
+                    settings=ReplaySettings(maximum_holding_bars=48),
+                    database_path=Path(folder) / "test.sqlite3",
+                )
