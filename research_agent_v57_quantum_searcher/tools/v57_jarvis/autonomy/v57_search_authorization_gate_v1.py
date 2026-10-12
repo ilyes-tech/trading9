@@ -23,6 +23,9 @@ def main():
  # Phase-2 gate is authorization-only. It never launches the searcher itself.
  admitted=not reasons
  out={'schema_version':1,'kind':'JARVIS_SEARCH_AUTHORIZATION_GATE_V1','status':'AUTHORIZED' if admitted else 'DENIED','reasons':reasons,'authorized':admitted,'max_candidates':4 if admitted else 0,'next_required_capability':'IMPLEMENT_INDEPENDENT_SCIENTIFIC_EVALUATION' if 'INDEPENDENT_SCIENTIFIC_VERIFIER_NOT_IMPLEMENTED' in reasons else None,'execution_started':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
+ review=evidence.get('replay_review')
+ out['replay_review_status']=review.get('status') if isinstance(review,dict) else 'REVIEW_NOT_REPORTED'
+ out['replay_review_reason']=review.get('reason') if isinstance(review,dict) else None
  p=S/'search_authorization_v1.json';q=S/'search_authorization_v1.tmp';q.write_text(json.dumps(out,indent=2,sort_keys=True)+'\n');q.replace(p)
  print(('ALL PASS' if admitted else 'DENIED')+'|SEARCH_AUTH_GATE_V1|AUTHORIZED='+str(admitted).upper()+'|REASONS='+(','.join(reasons) if reasons else 'NONE')+'|EXECUTION=NO');return 0 if admitted else 3
 if __name__=='__main__':sys.exit(main())

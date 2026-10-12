@@ -304,11 +304,54 @@ def assess_replay_evidence(folds, settings, manifest):
         return result('REPLAY_EVIDENCE_REJECTED',robustness.get('reason') or 'ROBUSTNESS_CRITERIA_FAILED')
     return result('REPLAY_CHECKS_PASS_SCIENTIFIC_REVIEW_BLOCKED')
 
+
+def review_pending_replay():
+    """Read one bounded request and evidence bundle; never confer trust or admission."""
+    import os
+    import stat
+    safe=dict(new_research_authorized=False,orders_allowed=False,mt5_allowed=False,
+              holdout_allowed=False,auto_promotion_allowed=False)
+    def report(status,reason=None):
+        return dict(status=status,reason=reason,**safe)
+    def read(name,limit):
+        if not isinstance(name,str) or not name.endswith('.json') or name.startswith('.') or '/' in name or '\\' in name:
+            raise ValueError('INVALID_PATH')
+        fd=os.open(S/name,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        with os.fdopen(fd,'rb') as stream:
+            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):raise ValueError('NOT_REGULAR_FILE')
+            raw=stream.read(limit+1)
+        if len(raw)>limit:raise ValueError('FILE_SIZE_LIMIT')
+        doc=json.loads(raw)
+        if not isinstance(doc,dict):raise ValueError('INVALID_SCHEMA')
+        if any(doc.get(k) is not False for k in ('orders_allowed','mt5_allowed','holdout_allowed','auto_promotion_allowed')):
+            raise ValueError('UNSAFE_FLAGS')
+        return raw,doc
+    request=S/'replay_review_request_v1.json'
+    if not request.exists() and not request.is_symlink():
+        return report('MISSING_REPLAY_EVIDENCE','NO_REVIEW_REQUEST')
+    try:
+        _,req=read(request.name,16384)
+        if req.get('kind')!='V57_REPLAY_REVIEW_REQUEST_V1':raise ValueError('INVALID_REQUEST_KIND')
+        raw,bundle=read(req.get('evidence_file'),2000000)
+        digest=hashlib.sha256(raw).hexdigest()
+        if req.get('evidence_sha256')!=digest:raise ValueError('EVIDENCE_HASH_MISMATCH')
+        if bundle.get('kind')!='V57_REPLAY_REVIEW_BUNDLE_V1':raise ValueError('INVALID_BUNDLE_KIND')
+        manifest=bundle.get('manifest')
+        if not isinstance(manifest,dict):raise ValueError('MISSING_MANIFEST')
+        for key in ('strategy_sha256','dataset_sha256'):
+            if not isinstance(req.get(key),str) or req[key]!=manifest.get(key):
+                raise ValueError('MANIFEST_BINDING_MISMATCH')
+        evaluation=assess_replay_evidence(bundle.get('folds'),bundle.get('settings'),manifest)
+        return dict(evaluation,evidence_sha256=digest,request_authenticity_verified=False)
+    except (OSError,ValueError,TypeError,RecursionError) as error:
+        return report('REPLAY_REVIEW_INPUT_REJECTED',str(error)[:160])
+
 def main():
  p=S/"multimarket_evidence_registry_v3.json";h=hashlib.sha256(p.read_bytes()).hexdigest()
  cases=[({"new_causal_evidence_verified":True},"DENY_SELF_ATTESTED"),({"evidence_file":"arbitrary_pass.json"},"DENY_UNTRUSTED_SOURCE"),({"evidence_file":p.name,"evidence_sha256":"0"*64},"DENY_HASH"),({"evidence_file":p.name,"evidence_sha256":h},"INTEGRITY_AND_SCHEMA_VERIFIED_NOT_CAUSAL_NOVELTY")]
  if any(verify(x)!=expected for x,expected in cases):raise RuntimeError("TESTS")
  doc={"schema_version":1,"kind":"V57_INDEPENDENT_EVIDENCE_VERIFIER_V2","status":"PASS","tests":len(cases),"allowlisted_sources":list(ALLOW),"source_sha256":h,"source_schema_checked":True,"trade_robustness_evaluation_supported":True,"trade_cost_arithmetic_supported":True,"temporal_metadata_checks_supported":True,"composed_replay_review_supported":True,"causal_novelty_proven":False,"new_research_authorized":False,"orders_allowed":False,"mt5_allowed":False,"holdout_allowed":False,"auto_promotion_allowed":False}
+ doc["replay_review"]=review_pending_replay()
  q=S/"independent_evidence_verifier_v2.tmp";q.write_text(json.dumps(doc,sort_keys=True,indent=2)+"\n");q.replace(S/"independent_evidence_verifier_v2.json")
  print("ALL PASS|INDEPENDENT_EVIDENCE_VERIFIER_V2|TESTS=4|ALLOWLIST=1|NOVELTY=NO")
 if __name__=="__main__":
