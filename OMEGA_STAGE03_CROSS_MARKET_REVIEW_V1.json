@@ -1,0 +1,78 @@
+{
+  "assessment": "The local BTC/LTC pair is not directly supported by the cited delayed-response result. Venue and period differences prevent claiming local refutation. The multi-market runtime is deferred; no costly extension or backtest is justified by this source alone.",
+  "auto_promotion_allowed": false,
+  "backtest_executed": false,
+  "causal_novelty_proven": false,
+  "data_scope": {
+    "content_read_this_review": false,
+    "independent_replication_proven": false,
+    "markets": [
+      {
+        "market": "BTCUSD",
+        "nonpositive_close": 0,
+        "rows": 44640,
+        "zero_trade_bars": 19
+      },
+      {
+        "market": "LTCUSD",
+        "nonpositive_close": 0,
+        "rows": 44640,
+        "zero_trade_bars": 7903
+      }
+    ],
+    "period": "2026-03-01T00:00:00Z_to_2026-03-31T23:59:00Z",
+    "stale_price_risk": "Previously reported zero-trade LTC bars require explicit treatment; a lag estimate could reflect stale observations."
+  },
+  "holdout_allowed": false,
+  "holdout_read": false,
+  "hypothesis": "Past closed-minute BTC returns add predictive value for the next LTC minute beyond LTC own past return.",
+  "inspected_sources": [
+    {
+      "path": "/home/trading/TradingAI-HF-Lab/research_agent_v57_quantum_searcher/config/v433/V57_V433_RUNTIME_CAPABILITY_CLASSIFICATION_V2.json",
+      "sha256": "f5ab403a5cccc712b965388610b9f8f0e0cb3cacc46907e832b8a5e54c27dfa8"
+    },
+    {
+      "path": "/home/trading/TradingAI-HF-Lab/research_agent_v57_quantum_searcher/config/v433/V57_V433_MONO_CONTEXT_RUNTIME_EXPANSION_CONTRACT_V2.json",
+      "sha256": "e4cf2187dd61c94315e029b4cd44fbec97088170bd07ae7c0c8d68fd10f1a63d"
+    },
+    {
+      "path": "/home/trading/.local/state/tradingai/jarvis-autonomous/stage03_development_scope_v1.json",
+      "sha256": "11821793a6c5adf5bd7a52b38c72c7ecd7398622f9c8ee5d632934e1e092bf86"
+    }
+  ],
+  "kind": "OMEGA_STAGE03_CROSS_MARKET_REVIEW_V1",
+  "local_novelty": {
+    "already_documented": true,
+    "execution_supported_by_inspected_contract": false,
+    "no_new_family_claimed": true,
+    "previous_backtest_exhaustion_proven": false,
+    "registry_logic": "LEADER_LAGGER_CONFIRM",
+    "requirement": "MULTICONTEXT_ALIGNMENT_ENGINE_REQUIRED"
+  },
+  "mt5_allowed": false,
+  "new_family_admitted": false,
+  "next_action": "REOPEN_ONLY_WITH_EVIDENCE_SUPPORTING_A_SPECIFIED_SUPPORTED_MARKET_PAIR_AND_A_REVIEWABLE_MULTICONTEXT_ALIGNMENT_CONTRACT",
+  "orders_allowed": false,
+  "repeat_same_source_review": false,
+  "research_execution_authorized": false,
+  "reviewed_at_utc": "2026-10-12T18:24:57.126664+00:00",
+  "schema_version": 1,
+  "source_review": {
+    "access": "PUBLISHER_FULLTEXT_WEB_REVIEWED_NO_LOCAL_BINARY_COPY",
+    "authors": [
+      "Tomoki Kurihara",
+      "Takuji Matsumoto"
+    ],
+    "doi": "10.1007/s10690-026-09589-z",
+    "paraphrase": "The study uses Binance one-minute prices and trade counts across several regimes. Its cross-correlation analysis reports mainly simultaneous BTC responses for ETH and LTC, whereas several smaller assets show delayed responses. Its trading models use lagged BTC and altcoin returns. This does not establish a profitable BTC-to-LTC lag on Kraken.",
+    "sections": [
+      "3.1",
+      "3.2",
+      "3.5",
+      "4.1"
+    ],
+    "title": "Price Transmission from Bitcoin to Altcoins: High-Frequency Evidence and Implications for Trading Strategy",
+    "url": "https://link.springer.com/article/10.1007/s10690-026-09589-z"
+  },
+  "status": "DEFER_NOT_AN_ADMISSIBLE_LOCAL_EXPERIMENT"
+}
