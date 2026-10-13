@@ -51,6 +51,7 @@ def review_submitted_candidate(coverage, registry):
             return result('REJECT',decision,candidate_sha256=digest)
         # Read each evidence once, with independent size and hash checks.
         evidence={}
+        declared_missing=[]
         mapping=(('source_file','source_sha256',None),
                  ('novelty_file','novelty_evidence_sha256','V57_CAUSAL_NOVELTY_EVIDENCE'),
                  ('replication_file','independent_replication_sha256','V57_CAUSAL_REPLICATION_EVIDENCE'))
@@ -70,8 +71,23 @@ def review_submitted_candidate(coverage, registry):
             if doc.get('family')!=candidate['native_family'] or doc.get('market')!=candidate['market']:
                 return result('REJECT','EVIDENCE_IDENTITY_MISMATCH',candidate_sha256=digest)
             evidence[field]=dict(file=name,sha256=candidate[hash_field])
+            # A signed-looking digest does not overrule evidence explicitly
+            # declaring that scientific authenticity or replication is absent.
+            required_by_file={
+                'source_file':('source_authenticity_independently_verified',
+                               'market_registry_instrument_identical_verified'),
+                'novelty_file':('mechanistic_novelty_independently_verified',),
+                'replication_file':('independent_experiment_replication_proven',),
+            }
+            declared_missing.extend(field+'.'+key for key in required_by_file[field]
+                                    if doc.get(key) is False)
         if len(set(names))!=3:
             return result('REJECT','IDENTICAL_EVIDENCE_FILES',candidate_sha256=digest)
+        if declared_missing:
+            return result('REJECT','EXPLICIT_REQUIRED_SCIENTIFIC_EVIDENCE_MISSING',
+                          candidate_sha256=digest,missing_prerequisites=declared_missing,
+                          source_authenticity_verified=False,independence_proven=False,
+                          causal_novelty_proven=False)
         return result('REVIEW_REQUIRED','FILES_VERIFIED_SCIENTIFIC_REVIEW_PENDING',
                       candidate_sha256=digest,native_family=candidate['native_family'],market=candidate['market'],
                       evidence=evidence,source_authenticity_verified=False,independence_proven=False,

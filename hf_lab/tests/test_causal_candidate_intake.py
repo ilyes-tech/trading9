@@ -28,6 +28,24 @@ def test_valid_files_only_enter_scientific_review(review):
  assert out['decision']=='REVIEW_REQUIRED'
  for k in ('new_family_admitted','research_execution_authorized','causal_novelty_proven','independence_proven','source_authenticity_verified'):
   assert out[k] is False
+def test_explicit_scientific_failures_are_rejected_before_peer_review(review):
+ f,p=review;x=dossier(p)
+ cases=[('source_file','source_sha256','source_authenticity_independently_verified'),
+        ('novelty_file','novelty_evidence_sha256','mechanistic_novelty_independently_verified'),
+        ('replication_file','independent_replication_sha256','independent_experiment_replication_proven')]
+ for name,key,flag in cases:
+  path=p/x[name];doc=json.loads(path.read_text());doc[flag]=False
+  raw=json.dumps(doc).encode();path.write_bytes(raw)
+  x[key]=hashlib.sha256(raw).hexdigest()
+ save(p,x);out=f(C,R)
+ assert out['decision']=='REJECT'
+ assert out['reason']=='EXPLICIT_REQUIRED_SCIENTIFIC_EVIDENCE_MISSING'
+ assert len(out['missing_prerequisites'])==3
+ assert out['new_family_admitted'] is False
+ assert out['research_execution_authorized'] is False
+ assert out['orders_allowed'] is False
+
+
 def test_exhausted_self_attested_unknown_and_unsafe(review):
  f,p=review
  for change,reason in [({'native_family':'trend'},'DENY_EXISTING_OR_EXHAUSTED_FAMILY'),({'new_causal_evidence_verified':True},'DENY_SELF_ATTESTATION'),({'market':'UNKNOWN'},'DENY_UNKNOWN_MARKET'),({'orders_allowed':True},'DENY_UNSAFE')]:
