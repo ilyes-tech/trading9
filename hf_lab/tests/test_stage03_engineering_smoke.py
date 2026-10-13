@@ -33,6 +33,31 @@ class Stage03SyntheticEngineeringTests(unittest.TestCase):
                         smoke.main()
                 self.assertFalse((folder / "report.json").exists())
 
+    def test_stage04_synthetic_cost_stress_rejects_false_improvement(self):
+        from hf_lab.replay import ReplaySettings, run_replay
+
+        bars = smoke.synthetic_bars()
+        safe = dict(shadow_only=True, allow_real_orders=False)
+        baseline = ReplaySettings(fee_bps_per_side=5, slippage_bps_per_side=1, **safe)
+        stressed = ReplaySettings(fee_bps_per_side=20, slippage_bps_per_side=5, **safe)
+        fingerprints = []
+        with tempfile.TemporaryDirectory() as temp:
+            for label, settings in (("base-a", baseline), ("base-b", baseline),
+                                    ("stress-a", stressed), ("stress-b", stressed)):
+                report = run_replay(symbol="SYNTHETIC_ONLY", dataset="STAGE04_PREFLIGHT",
+                                    bars=bars, strategy=smoke.momentum_burst,
+                                    settings=settings, database_path=Path(temp) / (label + ".db"))
+                fingerprints.append((report.metrics, tuple((t.signal_time, t.entry_time,
+                                     t.exit_time, t.net_r) for t in report.trades)))
+        self.assertEqual(fingerprints[0], fingerprints[1])
+        self.assertEqual(fingerprints[2], fingerprints[3])
+        self.assertEqual(fingerprints[0][0].trades, 83)
+        self.assertEqual(fingerprints[2][0].trades, 83)
+        self.assertGreater(fingerprints[0][0].net_r, 0)
+        self.assertLess(fingerprints[2][0].net_r, 0)
+        self.assertGreater(fingerprints[0][0].profit_factor, 2)
+        self.assertLess(fingerprints[2][0].profit_factor, 1)
+
     def test_safe_run_is_repeated_deterministic_and_not_admission(self):
         safe = dict(status="DENIED", authorized=False, execution_started=False,
                     orders_allowed=False, mt5_allowed=False, holdout_allowed=False)
