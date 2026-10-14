@@ -79,8 +79,10 @@ def review_submitted_candidate(coverage, registry):
                 'novelty_file':('mechanistic_novelty_independently_verified',),
                 'replication_file':('independent_experiment_replication_proven',),
             }
+            # Absence, non-bool and explicit denial all fail closed. True
+            # remains an untrusted claim: only REVIEW_REQUIRED, never admission.
             declared_missing.extend(field+'.'+key for key in required_by_file[field]
-                                    if doc.get(key) is False)
+                                    if doc.get(key) is not True)
         if len(set(names))!=3:
             return result('REJECT','IDENTICAL_EVIDENCE_FILES',candidate_sha256=digest)
         if declared_missing:

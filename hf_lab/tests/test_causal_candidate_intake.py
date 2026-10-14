@@ -19,17 +19,46 @@ def dossier(p):
   name=field+'.json';(p/name).write_bytes(body);x[field]=name;x[h]=hashlib.sha256(body).hexdigest()
  save(p,x);return x
 def save(p,x):(p/'causal_family_candidate_v2.json').write_text(json.dumps(x))
+REQUIRED=[('source_file','source_sha256','source_authenticity_independently_verified'),
+          ('source_file','source_sha256','market_registry_instrument_identical_verified'),
+          ('novelty_file','novelty_evidence_sha256','mechanistic_novelty_independently_verified'),
+          ('replication_file','independent_replication_sha256','independent_experiment_replication_proven')]
+def assert_claims_for_review(p,x):
+ for field,h,flag in REQUIRED:
+  path=p/x[field];doc=json.loads(path.read_text());doc[flag]=True
+  body=json.dumps(doc).encode();path.write_bytes(body)
+  x[h]=hashlib.sha256(body).hexdigest()
+ save(p,x)
 def test_missing_distinguished_from_invalid(review):
  f,p=review;assert f(C,R)['decision']=='MISSING'
  (p/'causal_family_candidate_v2.json').write_text('[]')
  assert f(C,R)['decision']=='REJECT'
 def test_valid_files_only_enter_scientific_review(review):
- f,p=review;dossier(p);out=f(C,R)
+ f,p=review;x=dossier(p);assert_claims_for_review(p,x);out=f(C,R)
  assert out['decision']=='REVIEW_REQUIRED'
  for k in ('new_family_admitted','research_execution_authorized','causal_novelty_proven','independence_proven','source_authenticity_verified'):
   assert out[k] is False
+def test_missing_scientific_claims_fail_closed(review):
+ f,p=review;dossier(p);out=f(C,R)
+ assert out['decision']=='REJECT'
+ assert out['reason']=='EXPLICIT_REQUIRED_SCIENTIFIC_EVIDENCE_MISSING'
+ assert len(out['missing_prerequisites'])==4
+ assert out['new_family_admitted'] is False
+ assert out['research_execution_authorized'] is False
+
+def test_non_boolean_verification_claim_fails_closed(review):
+ f,p=review;x=dossier(p);assert_claims_for_review(p,x)
+ name=x['novelty_file'];path=p/name;doc=json.loads(path.read_text())
+ doc['mechanistic_novelty_independently_verified']='true'
+ body=json.dumps(doc).encode();path.write_bytes(body)
+ x['novelty_evidence_sha256']=hashlib.sha256(body).hexdigest();save(p,x)
+ out=f(C,R)
+ assert out['decision']=='REJECT'
+ assert out['missing_prerequisites']==['novelty_file.mechanistic_novelty_independently_verified']
+ assert out['research_execution_authorized'] is False
+
 def test_explicit_scientific_failures_are_rejected_before_peer_review(review):
- f,p=review;x=dossier(p)
+ f,p=review;x=dossier(p);assert_claims_for_review(p,x)
  cases=[('source_file','source_sha256','source_authenticity_independently_verified'),
         ('novelty_file','novelty_evidence_sha256','mechanistic_novelty_independently_verified'),
         ('replication_file','independent_replication_sha256','independent_experiment_replication_proven')]
