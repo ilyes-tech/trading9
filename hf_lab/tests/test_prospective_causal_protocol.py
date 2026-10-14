@@ -167,3 +167,40 @@ def test_stage03_public_source_status_is_provisional_and_fail_closed(tmp_path):
     path.unlink()
     path.symlink_to('/nonexistent')
     assert gate() is None
+
+
+def test_global_forceorder_sample_cannot_be_misclassified_as_target_coinm(tmp_path):
+    import hashlib
+    ns = runpy.run_path(str(A / 'v57_hypothesis_feasibility_triage_v1.py'))
+    check = ns['non_target_liquidation_sample_sha256']
+    target = tmp_path / 'global.json'
+    check.__globals__['GLOBAL_FORCEORDER'] = target
+    assert check() is None
+    sample = dict(e='forceOrder', symbol='WALUSDT', st=1, side='SELL', sha256='a' * 64)
+    doc = dict(kind='OMEGA_STAGE03_GLOBAL_BINANCE_LIQUIDATION_MESSAGE_SCHEMA_TRIAGE_V1',
+               status='PUBLIC_REAL_FORCEORDER_MESSAGES_OBSERVED_USDM_ONLY_NO_COINM_TARGET',
+               target_symbol='BTCUSD_PERP', target_required_stream_type=2,
+               target_messages_observed=0,
+               liquidation_messages_verified_on_target_instrument=False,
+               public_observed_message_metadata=[sample], observed_messages=1,
+               research_execution_authorized=False, candidate_admitted=False,
+               backtest_executed=False, search_executed=False,
+               orders_allowed=False, mt5_allowed=False, holdout_allowed=False,
+               auto_promotion_allowed=False)
+    payload = json.dumps(doc).encode()
+    target.write_bytes(payload)
+    assert check() == hashlib.sha256(payload).hexdigest()
+    doc['public_observed_message_metadata'][0]['st'] = 2
+    target.write_text(json.dumps(doc))
+    assert check() is None
+    doc['public_observed_message_metadata'][0]['st'] = 1
+    doc['target_messages_observed'] = 1
+    target.write_text(json.dumps(doc))
+    assert check() is None
+    doc['target_messages_observed'] = 0
+    doc['research_execution_authorized'] = True
+    target.write_text(json.dumps(doc))
+    assert check() is None
+    target.unlink()
+    target.symlink_to(tmp_path / 'missing')
+    assert check() is None
