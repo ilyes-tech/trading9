@@ -57,6 +57,10 @@ class Stage03SyntheticEngineeringTests(unittest.TestCase):
         self.assertLess(fingerprints[2][0].net_r, 0)
         self.assertGreater(fingerprints[0][0].profit_factor, 2)
         self.assertLess(fingerprints[2][0].profit_factor, 1)
+        # Higher fees must never improve a trade when entries and exits agree.
+        for base, stressed_trade in zip(fingerprints[0][1], fingerprints[2][1], strict=True):
+            self.assertEqual(base[:3], stressed_trade[:3])
+            self.assertGreater(base[3], stressed_trade[3])
 
     def test_safe_run_is_repeated_deterministic_and_not_admission(self):
         safe = dict(status="DENIED", authorized=False, execution_started=False,
