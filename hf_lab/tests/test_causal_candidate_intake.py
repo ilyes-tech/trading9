@@ -1,5 +1,5 @@
 """Actual candidate intake on synthetic dossiers; never grants admission."""
-import hashlib,json,os,runpy
+import hashlib,json,os,runpy,subprocess
 from pathlib import Path
 import pytest
 ROOT=Path('/home/trading/TradingAI-HF-Lab')
@@ -33,11 +33,39 @@ def test_missing_distinguished_from_invalid(review):
  f,p=review;assert f(C,R)['decision']=='MISSING'
  (p/'causal_family_candidate_v2.json').write_text('[]')
  assert f(C,R)['decision']=='REJECT'
-def test_valid_files_only_enter_scientific_review(review):
+def test_verified_claims_without_independent_authority_are_rejected(review):
  f,p=review;x=dossier(p);assert_claims_for_review(p,x);out=f(C,R)
- assert out['decision']=='REVIEW_REQUIRED'
+ assert out['decision']=='REJECT'
+ assert out['reason']=='DENY_INDEPENDENT_REVIEW_AUTHORITY_NOT_PROVISIONED'
  for k in ('new_family_admitted','research_execution_authorized','causal_novelty_proven','independence_proven','source_authenticity_verified'):
   assert out[k] is False
+
+def test_external_ed25519_signature_binds_review_without_admission(review):
+ f,p=review;x=dossier(p);assert_claims_for_review(p,x)
+ private=p/'temporary-test-only-private.pem';public=p/'trusted-test-only-public.pem'
+ subprocess.run(['/usr/bin/openssl','genpkey','-algorithm','ED25519','-out',str(private)],check=True,capture_output=True)
+ subprocess.run(['/usr/bin/openssl','pkey','-in',str(private),'-pubout','-out',str(public)],check=True,capture_output=True)
+ public.chmod(0o644);f.__globals__['REVIEW_TRUST_KEY']=public
+ candidate_hash=hashlib.sha256((p/'causal_family_candidate_v2.json').read_bytes()).hexdigest()
+ payload=dict(kind='OMEGA_EXTERNAL_SCIENTIFIC_REVIEW_V1',candidate_sha256=candidate_hash,
+              family=x['native_family'],market=x['market'],source_sha256=x['source_sha256'],
+              novelty_evidence_sha256=x['novelty_evidence_sha256'],
+              independent_replication_sha256=x['independent_replication_sha256'],
+              decision='ELIGIBLE_FOR_INDEPENDENT_SCIENTIFIC_REVIEW_ONLY',reviewer_id='INDEPENDENT_TEST_FIXTURE')
+ review_file=p/'causal_independent_review_v1.json';review_file.write_text(json.dumps(payload,sort_keys=True))
+ signature=p/'causal_independent_review_v1.sig'
+ subprocess.run(['/usr/bin/openssl','pkeyutl','-sign','-inkey',str(private),'-rawin',
+                 '-in',str(review_file),'-out',str(signature)],check=True,capture_output=True)
+ out=f(C,R)
+ assert out['decision']=='REVIEW_REQUIRED' and out['reason']=='EXTERNALLY_SIGNED_FILES_VERIFIED_SCIENTIFIC_REVIEW_PENDING'
+ for key in ('new_family_admitted','research_execution_authorized','causal_novelty_proven','independence_proven','source_authenticity_verified','orders_allowed','mt5_allowed'):
+  assert out[key] is False
+ payload['reviewer_id']='TAMPERED';review_file.write_text(json.dumps(payload,sort_keys=True))
+ assert f(C,R)['reason']=='DENY_EXTERNAL_REVIEW_SIGNATURE_INVALID'
+ payload['candidate_sha256']='0'*64;review_file.write_text(json.dumps(payload,sort_keys=True))
+ assert f(C,R)['reason']=='DENY_EXTERNAL_REVIEW_BINDING'
+ public.chmod(0o666)
+ assert f(C,R)['reason']=='DENY_INDEPENDENT_REVIEW_AUTHORITY_NOT_PROVISIONED'
 def test_missing_scientific_claims_fail_closed(review):
  f,p=review;dossier(p);out=f(C,R)
  assert out['decision']=='REJECT'

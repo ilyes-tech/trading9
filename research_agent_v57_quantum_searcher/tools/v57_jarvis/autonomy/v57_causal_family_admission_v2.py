@@ -1,6 +1,74 @@
 import hashlib,json,sys
 from pathlib import Path
 S=Path("/home/trading/.local/state/tradingai/jarvis-autonomous")
+REVIEW_TRUST_KEY=Path('/etc/tradingai/omega-scientific-review-pubkey.pem')
+
+
+def verify_external_review_signature(candidate, candidate_sha256):
+    """Externally signed review eligibility, never scientific admission.
+
+    Trust key is separately provisioned outside the repository/state, root-owned
+    and immutable to the research account. The review binds all three proofs.
+    Missing authority, invalid signature, or stale evidence must fail closed.
+    """
+    import os
+    import stat
+    import subprocess
+    import tempfile
+
+    def read_regular(path, max_bytes, trusted=False):
+        fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+        with os.fdopen(fd,'rb') as f:
+            info=os.fstat(f.fileno())
+            if not stat.S_ISREG(info.st_mode):raise ValueError('NOT_REGULAR_FILE')
+            if trusted and (info.st_uid!=0 or info.st_mode & 0o022):
+                raise ValueError('UNTRUSTED_PUBLIC_KEY_PERMISSIONS')
+            payload=f.read(max_bytes+1)
+        if len(payload)>max_bytes:raise ValueError('SIZE_LIMIT')
+        return payload
+
+    if not isinstance(candidate_sha256,str) or len(candidate_sha256)!=64:
+        return 'DENY_CANDIDATE_HASH'
+    try:
+        public_key=read_regular(REVIEW_TRUST_KEY,4096,trusted=True)
+    except (OSError,ValueError):
+        return 'DENY_INDEPENDENT_REVIEW_AUTHORITY_NOT_PROVISIONED'
+    try:
+        review=read_regular(S/'causal_independent_review_v1.json',16384)
+        signature=read_regular(S/'causal_independent_review_v1.sig',256)
+        payload=json.loads(review)
+        if not isinstance(payload,dict):return 'DENY_EXTERNAL_REVIEW_SCHEMA'
+        expected={'kind':'OMEGA_EXTERNAL_SCIENTIFIC_REVIEW_V1',
+                  'candidate_sha256':candidate_sha256,
+                  'family':candidate.get('native_family'),
+                  'market':candidate.get('market'),
+                  'source_sha256':candidate.get('source_sha256'),
+                  'novelty_evidence_sha256':candidate.get('novelty_evidence_sha256'),
+                  'independent_replication_sha256':candidate.get('independent_replication_sha256'),
+                  'decision':'ELIGIBLE_FOR_INDEPENDENT_SCIENTIFIC_REVIEW_ONLY'}
+        if any(payload.get(k)!=v for k,v in expected.items()):
+            return 'DENY_EXTERNAL_REVIEW_BINDING'
+        if not isinstance(payload.get('reviewer_id'),str) or not payload['reviewer_id'].strip():
+            return 'DENY_EXTERNAL_REVIEW_SCHEMA'
+        with tempfile.TemporaryDirectory(prefix='omega-external-review-') as folder:
+            folder=Path(folder)
+            key_file,review_file,sig_file=(folder/x for x in ('public.pem','review.json','review.sig'))
+            key_file.write_bytes(public_key)
+            review_file.write_bytes(review)
+            sig_file.write_bytes(signature)
+            key_check=subprocess.run(('/usr/bin/openssl','pkey','-pubin',
+                                      '-in',str(key_file),'-text_pub','-noout'),
+                                     capture_output=True,timeout=6,check=False)
+            if key_check.returncode!=0 or b'ED25519 Public-Key' not in key_check.stdout:
+                return 'DENY_EXTERNAL_REVIEW_KEY_NOT_ED25519'
+            check=subprocess.run(('/usr/bin/openssl','pkeyutl','-verify','-pubin',
+                                  '-inkey',str(key_file),'-sigfile',str(sig_file),
+                                  '-rawin','-in',str(review_file)),capture_output=True,
+                                 timeout=6,check=False)
+        if check.returncode!=0:return 'DENY_EXTERNAL_REVIEW_SIGNATURE_INVALID'
+        return 'TRUSTED_EXTERNAL_REVIEW_SIGNATURE_VERIFIED_NOT_ADMISSION'
+    except (OSError,ValueError,TypeError,UnicodeError,subprocess.TimeoutExpired):
+        return 'DENY_EXTERNAL_REVIEW_UNREADABLE'
 def check(x,exhausted):
  if not isinstance(x,dict):return "DENY_MALFORMED"
  family=x.get("native_family")
@@ -90,7 +158,12 @@ def review_submitted_candidate(coverage, registry):
                           candidate_sha256=digest,missing_prerequisites=declared_missing,
                           source_authenticity_verified=False,independence_proven=False,
                           causal_novelty_proven=False)
-        return result('REVIEW_REQUIRED','FILES_VERIFIED_SCIENTIFIC_REVIEW_PENDING',
+        attestation=verify_external_review_signature(candidate,digest)
+        if attestation!='TRUSTED_EXTERNAL_REVIEW_SIGNATURE_VERIFIED_NOT_ADMISSION':
+            return result('REJECT',attestation,candidate_sha256=digest,
+                          source_authenticity_verified=False,independence_proven=False,
+                          causal_novelty_proven=False)
+        return result('REVIEW_REQUIRED','EXTERNALLY_SIGNED_FILES_VERIFIED_SCIENTIFIC_REVIEW_PENDING',
                       candidate_sha256=digest,native_family=candidate['native_family'],market=candidate['market'],
                       evidence=evidence,source_authenticity_verified=False,independence_proven=False,
                       causal_novelty_proven=False)
@@ -103,7 +176,7 @@ def main():
  exhausted=set(v["exhausted_families"]);safe={k:False for k in ("orders_allowed","mt5_allowed","holdout_allowed","auto_promotion_allowed")}
  cases=[({}, "DENY_MISSING_FAMILY"),({"native_family":"momentum",**safe},"DENY_EXHAUSTED_FAMILY"),({"native_family":"new_family","new_causal_evidence_verified":True,**safe},"DENY_UNTRUSTED_SELF_ATTESTATION"),({"native_family":"new_family",**safe},"DENY_NO_INDEPENDENT_EVIDENCE_VERIFIER"),({"native_family":"new_family","orders_allowed":True,**{k:v for k,v in safe.items() if k!="orders_allowed"}},"DENY_UNSAFE")]
  if any(check(x,exhausted)!=expected for x,expected in cases):raise RuntimeError("TESTS")
- doc={"schema_version":1,"kind":"V57_CAUSAL_FAMILY_ADMISSION_V2","status":"PASS","coverage_sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"tests":len(cases),"independent_evidence_verifier":"NOT_IMPLEMENTED","self_attestation_accepted":False,"new_family_admitted":False,"research_execution_authorized":False,**safe}
+ doc={"schema_version":1,"kind":"V57_CAUSAL_FAMILY_ADMISSION_V2","status":"PASS","coverage_sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"tests":len(cases),"independent_evidence_verifier":"NOT_IMPLEMENTED","external_signed_review_gate":"ED25519_IMPLEMENTED_FAIL_CLOSED_NOT_SCIENTIFIC_ADMISSION","self_attestation_accepted":False,"new_family_admitted":False,"research_execution_authorized":False,**safe}
  registry=json.loads((S/"multimarket_evidence_registry_v3.json").read_text())
  doc["candidate_review"]=review_submitted_candidate(v,registry)
  q=S/"causal_family_admission_v2.tmp";q.write_text(json.dumps(doc,sort_keys=True,indent=2)+"\n");q.replace(S/"causal_family_admission_v2.json")
