@@ -86,3 +86,84 @@ def test_review_file_rejects_symlink_and_oversize(tmp_path):
         assert str(e) == 'INVALID_REVIEW_FILE'
     else:
         assert False, 'review must reject oversized inputs'
+
+
+def test_stage03_preexperiment_review_is_separate_from_replication(tmp_path):
+    """Review of a first experiment never needs fabricated replication evidence."""
+    import hashlib
+    ns = runpy.run_path(str(A / 'v57_hypothesis_feasibility_triage_v1.py'))
+    gate = ns['first_experiment_review_status']
+    gate.__globals__['PREEXPERIMENT'] = tmp_path / 'preexperiment.json'
+    gate.__globals__['PREEXPERIMENT_REVIEW'] = tmp_path / 'review.json'
+    assert gate() is None
+    proposal = complete()
+    proposal['hypothesis']['market'] = 'Binance COIN-M BTCUSD_PERP'
+    raw = json.dumps(proposal).encode()
+    (tmp_path / 'preexperiment.json').write_bytes(raw)
+    digest = hashlib.sha256(raw).hexdigest()
+    (tmp_path / 'review.json').write_text(json.dumps({
+        'status': 'PROTOCOL_REVIEW_REQUIRED_NOT_AUTHORIZED',
+        'submission_sha256': digest,
+        'independent_evidence_verified': False,
+        'research_execution_authorized': False,
+        'execution_authorized': False,
+        'orders_allowed': False, 'mt5_allowed': False,
+        'holdout_allowed': False, 'auto_promotion_allowed': False}))
+    assert gate() == digest
+    proposal['hypothesis']['market'] = 'different-market'
+    (tmp_path / 'preexperiment.json').write_text(json.dumps(proposal))
+    assert gate() is None
+
+
+def test_stage03_preexperiment_rejects_unsafe_and_tampered_review(tmp_path):
+    import hashlib
+    ns = runpy.run_path(str(A / 'v57_hypothesis_feasibility_triage_v1.py'))
+    gate = ns['first_experiment_review_status']
+    gate.__globals__['PREEXPERIMENT'] = tmp_path / 'preexperiment.json'
+    gate.__globals__['PREEXPERIMENT_REVIEW'] = tmp_path / 'review.json'
+    proposal = complete()
+    proposal['hypothesis']['market'] = 'BTCUSD_PERP'
+    proposal_raw = json.dumps(proposal).encode()
+    (tmp_path / 'preexperiment.json').write_bytes(proposal_raw)
+    review = dict(status='PROTOCOL_REVIEW_REQUIRED_NOT_AUTHORIZED',
+                  submission_sha256=hashlib.sha256(proposal_raw).hexdigest(),
+                  independent_evidence_verified=False,
+                  research_execution_authorized=False,
+                  execution_authorized=False, orders_allowed=False,
+                  mt5_allowed=False, holdout_allowed=False, auto_promotion_allowed=False)
+    (tmp_path / 'review.json').write_text(json.dumps(review))
+    assert gate()
+    review['research_execution_authorized'] = True
+    (tmp_path / 'review.json').write_text(json.dumps(review))
+    assert gate() is None
+    review['research_execution_authorized'] = False
+    review['submission_sha256'] = '0' * 64
+    (tmp_path / 'review.json').write_text(json.dumps(review))
+    assert gate() is None
+    (tmp_path / 'preexperiment.json').unlink()
+    (tmp_path / 'preexperiment.json').symlink_to(tmp_path / 'review.json')
+    assert gate() is None
+
+
+def test_stage03_public_source_status_is_provisional_and_fail_closed(tmp_path):
+    import hashlib
+    ns = runpy.run_path(str(A / 'v57_hypothesis_feasibility_triage_v1.py'))
+    gate = ns['public_liquidation_source_status']
+    path = tmp_path / 'source.json'
+    gate.__globals__['SOURCE'] = path
+    assert gate() is None
+    doc = dict(kind='OMEGA_STAGE03_LIQUIDATION_PUBLIC_SOURCE_ACCESS_REVIEW_V1',
+               status='PUBLIC_FUTURES_INSTRUMENT_AND_BOOK_REST_ACCESS_VERIFIED_LIQUIDATION_STREAM_UNTESTED',
+               instrument=dict(symbol='BTCUSD_PERP', pair='BTCUSD'),
+               research_execution_authorized=False, candidate_admitted=False,
+               orders_allowed=False, mt5_allowed=False, holdout_allowed=False,
+               auto_promotion_allowed=False)
+    raw = json.dumps(doc).encode()
+    path.write_bytes(raw)
+    assert gate() == hashlib.sha256(raw).hexdigest()
+    doc['orders_allowed'] = True
+    path.write_text(json.dumps(doc))
+    assert gate() is None
+    path.unlink()
+    path.symlink_to('/nonexistent')
+    assert gate() is None
