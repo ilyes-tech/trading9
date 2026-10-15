@@ -305,3 +305,95 @@ def test_stage03_historical_regime_coverage_tracks_checksums_but_denies_admissio
     doc['records']=rows
     report.write_text(json.dumps(doc))
     assert check() is None
+
+
+def test_initial_external_signature_binding_is_review_only(tmp_path):
+    """Test-only Ed25519 authority; never provision or forge a production reviewer."""
+    import hashlib
+    import subprocess
+    verify = NS['verify_signed_initial_review']
+    state = tmp_path / 'state'
+    folder = state / 'stage03_liquidation_source_access_v1'
+    folder.mkdir(parents=True)
+    keys = ('protocol','review','regimes','temporal','costs','live','other_market')
+    evidence = {}
+    for key in keys:
+        file = folder / (key + '.json')
+        raw = json.dumps(dict(test_only=True, evidence_type=key)).encode()
+        file.write_bytes(raw)
+        evidence[key] = dict(relative_file=str(file.relative_to(state)),
+                             sha256=hashlib.sha256(raw).hexdigest())
+    packet = folder / 'initial_method_review_handoff_v1.json'
+    packet_data = dict(kind='OMEGA_STAGE03_EXTERNAL_PREEXPERIMENT_REVIEW_HANDOFF_V1',
+                       status='READY_FOR_EXTERNAL_REVIEW_ONLY',
+                       instrument='BINANCE_COINM_BTCUSD_PERP',
+                       verified_source_files=evidence, development_authorized=False,
+                       candidate_admitted=False, search_executed=False, backtest_executed=False,
+                       orders_allowed=False, mt5_allowed=False, holdout_allowed=False,
+                       auto_promotion_allowed=False)
+    packet.write_text(json.dumps(packet_data))
+    private=tmp_path/'synthetic-only-private.pem'
+    public=tmp_path/'synthetic-only-public.pem'
+    subprocess.run(['/usr/bin/openssl','genpkey','-algorithm','ED25519','-out',str(private)],
+                   check=True,capture_output=True)
+    subprocess.run(['/usr/bin/openssl','pkey','-in',str(private),'-pubout','-out',str(public)],
+                   check=True,capture_output=True)
+    public.chmod(0o644)
+    review=folder/'external_initial_review_v1.json'
+    sig=folder/'external_initial_review_v1.sig'
+    values=dict(kind='OMEGA_EXTERNAL_INITIAL_SCIENTIFIC_REVIEW_V1',
+                packet_sha256=hashlib.sha256(packet.read_bytes()).hexdigest(),
+                protocol_sha256=evidence['protocol']['sha256'],
+                instrument='BINANCE_COINM_BTCUSD_PERP',
+                decision='ELIGIBLE_FOR_SCIENTIFIC_INITIAL_REVIEW_ONLY',
+                reviewer_id='SYNTHETIC_ISOLATED_TEST')
+    review.write_text(json.dumps(values,sort_keys=True))
+    subprocess.run(['/usr/bin/openssl','pkeyutl','-sign','-inkey',str(private),
+                    '-rawin','-in',str(review),'-out',str(sig)],
+                   check=True,capture_output=True)
+    out=verify(packet,review,sig,public)
+    assert out['status']=='INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED'
+    assert all(out[k] is False for k in ('research_execution_authorized','causal_novelty_proven',
+                                         'independent_replication_proven','orders_allowed','mt5_allowed'))
+    (folder/'regimes.json').write_text('tampered')
+    assert verify(packet,review,sig,public)['status']=='DENY_INITIAL_REVIEW_EVIDENCE_TAMPERED'
+    (folder/'regimes.json').write_text(json.dumps(dict(test_only=True,evidence_type='regimes')))
+    values['reviewer_id']='CHANGED_AFTER_SIGNATURE'
+    review.write_text(json.dumps(values,sort_keys=True))
+    assert verify(packet,review,sig,public)['status']=='DENY_INITIAL_REVIEW_SIGNATURE_INVALID'
+    public.chmod(0o666)
+    assert verify(packet,review,sig,public)['status']=='DENY_INDEPENDENT_REVIEW_AUTHORITY_NOT_PROVISIONED'
+
+
+def test_initial_external_review_requires_real_trust_key_and_safe_packet(tmp_path):
+    import hashlib
+    verify=NS['verify_signed_initial_review']
+    state=tmp_path/'state'
+    folder=state/'stage03_liquidation_source_access_v1'
+    folder.mkdir(parents=True)
+    names=('protocol','review','regimes','temporal','costs','live','other_market')
+    files={}
+    for n in names:
+        file=folder/(n+'.json')
+        file.write_text('test-only')
+        files[n]=dict(relative_file=str(file.relative_to(state)),
+                      sha256=hashlib.sha256(file.read_bytes()).hexdigest())
+    packet=folder/'packet.json'
+    doc=dict(kind='OMEGA_STAGE03_EXTERNAL_PREEXPERIMENT_REVIEW_HANDOFF_V1',
+             status='READY_FOR_EXTERNAL_REVIEW_ONLY',instrument='BINANCE_COINM_BTCUSD_PERP',
+             verified_source_files=files,development_authorized=False,candidate_admitted=False,
+             search_executed=False,backtest_executed=False,orders_allowed=False,
+             mt5_allowed=False,holdout_allowed=False,auto_promotion_allowed=False)
+    packet.write_text(json.dumps(doc))
+    review=folder/'review.json'
+    sig=folder/'review.sig'
+    missing=tmp_path/'not-provisioned.pem'
+    assert verify(packet,review,sig,missing)['status']=='DENY_INDEPENDENT_REVIEW_AUTHORITY_NOT_PROVISIONED'
+    doc['development_authorized']=True
+    packet.write_text(json.dumps(doc))
+    assert verify(packet,review,sig,missing)['status']=='DENY_INITIAL_REVIEW_PACKET_SCHEMA'
+    doc['development_authorized']=False
+    packet.write_text(json.dumps(doc))
+    (folder/'protocol.json').unlink()
+    (folder/'protocol.json').symlink_to('/nonexistent')
+    assert verify(packet,review,sig,missing)['status']=='DENY_INITIAL_REVIEW_PACKET_UNREADABLE'
