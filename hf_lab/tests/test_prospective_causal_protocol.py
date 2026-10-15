@@ -315,7 +315,7 @@ def test_initial_external_signature_binding_is_review_only(tmp_path):
     state = tmp_path / 'state'
     folder = state / 'stage03_liquidation_source_access_v1'
     folder.mkdir(parents=True)
-    keys = ('protocol','review','regimes','temporal','costs','live','other_market')
+    keys = ('protocol','review','regimes','temporal','costs','live','other_market','historical_quotes')
     evidence = {}
     for key in keys:
         file = folder / (key + '.json')
@@ -397,3 +397,52 @@ def test_initial_external_review_requires_real_trust_key_and_safe_packet(tmp_pat
     (folder/'protocol.json').unlink()
     (folder/'protocol.json').symlink_to('/nonexistent')
     assert verify(packet,review,sig,missing)['status']=='DENY_INITIAL_REVIEW_PACKET_UNREADABLE'
+
+
+def test_historical_top_of_book_audit_is_byte_bound_not_execution(tmp_path):
+    """A verified prior quote is not a live received quote or executable fill."""
+    import hashlib
+    ns=runpy.run_path(str(A/'v57_hypothesis_feasibility_triage_v1.py'))
+    gate=ns['historical_quote_coverage']
+    gate.__globals__['HISTORICAL_QUOTES']=tmp_path/'historical_pre_event_quote_coverage_v1.json'
+    gate.__globals__['HISTORICAL_REGIME']=tmp_path/'historical_regime_source_audit_v1.json'
+    assert gate() is None
+    regime=b'test-only-regime'
+    (tmp_path/'historical_regime_source_audit_v1.json').write_bytes(regime)
+    body=b'test-only-zip-not-for-trading'
+    source=tmp_path/'BTCUSD_PERP-bookTicker-2024-08-05.zip'
+    checksum=tmp_path/'BTCUSD_PERP-bookTicker-2024-08-05.zip.CHECKSUM'
+    source.write_bytes(body)
+    sha=hashlib.sha256(body).hexdigest()
+    checksum.write_text(sha+'  BTCUSD_PERP-bookTicker-2024-08-05.zip\n')
+    safe={k:False for k in ('research_execution_authorized','backtest_executed',
+                             'search_executed','orders_allowed','mt5_allowed',
+                             'holdout_allowed','auto_promotion_allowed')}
+    report=dict(kind='OMEGA_STAGE03_BTCUSD_PERP_ARCHIVED_QUOTES_PRE_EVENT_AUDIT_V1',
+      status='HISTORICAL_BEFORE_EVENT_QUOTE_COVERAGE_CHECKED_NOT_EXECUTABLE',
+      instrument='BINANCE_COINM_BTCUSD_PERP',day='2024-08-05',
+      source_metadata_sha256=hashlib.sha256(regime).hexdigest(),
+      source_zip_bytes=len(body),source_zip_sha256=sha,
+      liquidation_unique_timestamps=952,before_event_quotes_matched=952,
+      before_event_quotes_missing=0,strictly_before_exchange_event_time=True,
+      quotes_are_proven_received_at_decision_time=False,
+      broker_fills_verified=False,cost_model_fully_calibrated=False,
+      scientific_independence_verified=False,median_quote_spread_bps=0.02,**safe)
+    report_path=tmp_path/'historical_pre_event_quote_coverage_v1.json'
+    raw=json.dumps(report).encode()
+    report_path.write_bytes(raw)
+    assert gate()==hashlib.sha256(raw).hexdigest()
+    source.write_bytes(b'tampered')
+    assert gate() is None
+    source.write_bytes(body)
+    report['research_execution_authorized']=True
+    report_path.write_text(json.dumps(report))
+    assert gate() is None
+    report['research_execution_authorized']=False
+    report['quotes_are_proven_received_at_decision_time']=True
+    report_path.write_text(json.dumps(report))
+    assert gate() is None
+    report['quotes_are_proven_received_at_decision_time']=False
+    report_path.write_text(json.dumps(report))
+    checksum.write_text('0'*64+'  file.zip\n')
+    assert gate() is None

@@ -162,8 +162,9 @@ def verify_signed_initial_review(packet_path, review_path, signature_path, trust
                         'holdout_allowed', 'auto_promotion_allowed'))):
             return result('DENY_INITIAL_REVIEW_PACKET_SCHEMA')
         evidence = packet.get('verified_source_files')
-        if not isinstance(evidence, dict) or set(evidence) != {
-                'protocol', 'review', 'regimes', 'temporal', 'costs', 'live', 'other_market'}:
+        required = {'protocol', 'review', 'regimes', 'temporal', 'costs', 'live', 'other_market'}
+        allowed = required | {'historical_quotes'}
+        if not isinstance(evidence, dict) or not required.issubset(evidence) or set(evidence) - allowed:
             return result('DENY_INITIAL_REVIEW_EVIDENCE_SCHEMA')
         root = Path(packet_path).parent.parent
         for entry in evidence.values():

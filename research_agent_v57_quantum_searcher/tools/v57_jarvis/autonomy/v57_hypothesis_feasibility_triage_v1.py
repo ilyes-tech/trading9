@@ -17,6 +17,52 @@ INITIAL_HANDOFF=S/'stage03_liquidation_source_access_v1/initial_method_review_ha
 INITIAL_EXTERNAL_REVIEW=INITIAL_HANDOFF.with_name('external_initial_review_v1.json')
 INITIAL_EXTERNAL_SIGNATURE=INITIAL_HANDOFF.with_name('external_initial_review_v1.sig')
 INITIAL_TRUST_KEY=Path('/etc/tradingai/omega-scientific-review-pubkey.pem')
+HISTORICAL_QUOTES=HISTORICAL.with_name('historical_pre_event_quote_coverage_v1.json')
+
+
+def historical_quote_coverage():
+    """Byte-verify the top-of-book data audit; never infer live receipt or fills."""
+    import math
+    try:
+        if not HISTORICAL_QUOTES.is_file() or HISTORICAL_QUOTES.is_symlink() or HISTORICAL_QUOTES.stat().st_size>16000:
+            return None
+        raw=HISTORICAL_QUOTES.read_bytes()
+        doc=json.loads(raw)
+        source=HISTORICAL_QUOTES.parent/'BTCUSD_PERP-bookTicker-2024-08-05.zip'
+        checksums=HISTORICAL_QUOTES.parent/'BTCUSD_PERP-bookTicker-2024-08-05.zip.CHECKSUM'
+        if (doc.get('kind')!='OMEGA_STAGE03_BTCUSD_PERP_ARCHIVED_QUOTES_PRE_EVENT_AUDIT_V1'
+                or doc.get('status')!='HISTORICAL_BEFORE_EVENT_QUOTE_COVERAGE_CHECKED_NOT_EXECUTABLE'
+                or doc.get('instrument')!='BINANCE_COINM_BTCUSD_PERP'
+                or doc.get('day')!='2024-08-05'
+                or doc.get('source_metadata_sha256')!=hashlib.sha256(HISTORICAL_REGIME.read_bytes()).hexdigest()
+                or doc.get('liquidation_unique_timestamps')!=952
+                or doc.get('before_event_quotes_matched')!=952
+                or doc.get('before_event_quotes_missing')!=0
+                or doc.get('strictly_before_exchange_event_time') is not True
+                or doc.get('quotes_are_proven_received_at_decision_time') is not False
+                or doc.get('broker_fills_verified') is not False
+                or doc.get('cost_model_fully_calibrated') is not False
+                or doc.get('scientific_independence_verified') is not False
+                or any(doc.get(k) is not False for k in ('research_execution_authorized','backtest_executed',
+                          'search_executed','orders_allowed','mt5_allowed','holdout_allowed','auto_promotion_allowed'))
+                or not source.is_file() or source.is_symlink()
+                or source.stat().st_size!=doc.get('source_zip_bytes')
+                or not checksums.is_file() or checksums.is_symlink()):
+            return None
+        digest=doc.get('source_zip_sha256')
+        if not isinstance(digest,str) or len(digest)!=64:
+            return None
+        if checksums.read_text().split()[0]!=digest:
+            return None
+        with source.open('rb') as f:
+            if hashlib.file_digest(f,'sha256').hexdigest()!=digest:
+                return None
+        spread=doc.get('median_quote_spread_bps')
+        if not isinstance(spread,(float,int)) or not math.isfinite(spread) or spread<0:
+            return None
+        return hashlib.sha256(raw).hexdigest()
+    except (OSError,ValueError,TypeError,AttributeError,IndexError):
+        return None
 
 
 def independent_initial_review_status():
@@ -198,6 +244,7 @@ def main():
     non_target_sample_sha256=non_target_liquidation_sample_sha256()
     historical_archive_sha256=historical_coinm_archive_integrity_sha256()
     regime=historical_regime_coverage()
+    quote_audit_sha256=historical_quote_coverage()
     first_review_signature=independent_initial_review_status()
     rows=[]
     for p in proposals['proposals']:
@@ -213,7 +260,7 @@ def main():
         else:
             classification='UNSPECIFIED_MECHANISM_REQUIRES_REVIEW'
         rows.append({'hypothesis_id':p['hypothesis_id'],'source_doi':p['source_doi'],'classification':classification,'status':'NOT_ADMITTED','novelty_verified':False,'execution_authorized':False})
-    result={'kind':'V57_HYPOTHESIS_FEASIBILITY_TRIAGE_V1','status':'PASS_REVIEW_ONLY','reviewed':len(rows),'data_sha256':data['sha256'],'public_futures_book_source_review_sha256':public_source_sha256,'first_experiment_review_only_sha256':preexperiment_sha256,'first_experiment_status':('FORMULATED_FOR_EXTERNAL_PREEXPERIMENT_REVIEW_NOT_AUTHORIZED' if preexperiment_sha256 else 'PREEXPERIMENT_REVIEW_NOT_ESTABLISHED'),'independent_replication_required_for_first_hypothesis_review':False,'independent_replication_required_for_final_admission':True,'non_target_global_liquidation_sample_sha256':non_target_sample_sha256,'non_target_global_liquidation_status':('THREE_USDM_ST1_MESSAGES_OBSERVED_NOT_COINM_BTCUSD_PERP' if non_target_sample_sha256 else 'NO_VALID_NON_TARGET_WS_SAMPLE'),'target_historical_archive_integrity_sha256':historical_archive_sha256,'target_historical_unique_timestamps_checked':(24 if historical_archive_sha256 else 0),'target_historical_archive_role':'EXPLORATORY_SOURCE_INTEGRITY_ONLY_NOT_PROSPECTIVE','target_historical_regime_source_sha256':(regime[0] if regime else None),'target_historical_temporal_coverage_sha256':(regime[1] if regime else None),'target_historical_four_sampled_days_distinct_snapshot_times':(regime[2] if regime else 0),'target_historical_bookdepth_bucket_seconds':(30 if regime else None),'target_historical_sampled_prospective_or_replicated':False,'independent_initial_review_signature_status':first_review_signature,'independent_initial_review_is_execution_authorization':False,'target_instrument_forceorder_messages_verified':False,'liquidation_observations_verified':False,'independent_replication_verified':False,'items':rows,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
+    result={'kind':'V57_HYPOTHESIS_FEASIBILITY_TRIAGE_V1','status':'PASS_REVIEW_ONLY','reviewed':len(rows),'data_sha256':data['sha256'],'public_futures_book_source_review_sha256':public_source_sha256,'first_experiment_review_only_sha256':preexperiment_sha256,'first_experiment_status':('FORMULATED_FOR_EXTERNAL_PREEXPERIMENT_REVIEW_NOT_AUTHORIZED' if preexperiment_sha256 else 'PREEXPERIMENT_REVIEW_NOT_ESTABLISHED'),'independent_replication_required_for_first_hypothesis_review':False,'independent_replication_required_for_final_admission':True,'non_target_global_liquidation_sample_sha256':non_target_sample_sha256,'non_target_global_liquidation_status':('THREE_USDM_ST1_MESSAGES_OBSERVED_NOT_COINM_BTCUSD_PERP' if non_target_sample_sha256 else 'NO_VALID_NON_TARGET_WS_SAMPLE'),'target_historical_archive_integrity_sha256':historical_archive_sha256,'target_historical_unique_timestamps_checked':(24 if historical_archive_sha256 else 0),'target_historical_archive_role':'EXPLORATORY_SOURCE_INTEGRITY_ONLY_NOT_PROSPECTIVE','target_historical_regime_source_sha256':(regime[0] if regime else None),'target_historical_temporal_coverage_sha256':(regime[1] if regime else None),'target_historical_four_sampled_days_distinct_snapshot_times':(regime[2] if regime else 0),'target_historical_bookdepth_bucket_seconds':(30 if regime else None),'target_historical_prior_quote_audit_sha256':quote_audit_sha256,'target_historical_prior_quote_coverage':(952 if quote_audit_sha256 else 0),'target_historical_quotes_verified_executable':False,'target_historical_sampled_prospective_or_replicated':False,'independent_initial_review_signature_status':first_review_signature,'independent_initial_review_is_execution_authorization':False,'target_instrument_forceorder_messages_verified':False,'liquidation_observations_verified':False,'independent_replication_verified':False,'items':rows,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
     tmp=O.with_suffix('.tmp')
     tmp.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
     tmp.replace(O)
