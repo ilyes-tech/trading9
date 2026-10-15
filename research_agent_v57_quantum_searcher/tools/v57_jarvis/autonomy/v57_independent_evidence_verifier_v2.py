@@ -411,6 +411,16 @@ def stage03_preexperiment_readiness(packet, sources, external_review_status):
             or live.get('kind')!='OMEGA_STAGE03_COINM_WS_BOUNDED_ONE_SHOT_OBSERVATION_V1'):
         return result('PREEXPERIMENT_INPUT_REJECTED', ['INCOMPATIBLE_EVIDENCE_SCHEMA_OR_INSTRUMENT'])
     missing=[]
+    signed_rejections = {
+        'SIGNED_INITIAL_REVIEW_REJECT_REDUNDANT_MECHANISM_NOT_AUTHORIZED',
+        'SIGNED_INITIAL_REVIEW_REJECT_INSUFFICIENT_SOURCE_NOT_AUTHORIZED',
+    }
+    if external_review_status in signed_rejections:
+        return result('PREEXPERIMENT_REJECTED_BY_INDEPENDENT_REVIEW',
+                      [external_review_status])
+    if external_review_status=='SIGNED_INITIAL_REVIEW_REQUEST_FIXED_DEFINITION_NOT_AUTHORIZED':
+        return result('PREEXPERIMENT_REVISION_REQUESTED_BY_INDEPENDENT_REVIEW',
+                      [external_review_status])
     if external_review_status!='INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED':
         missing.append('EXTERNAL_INDEPENDENT_REVIEW_SIGNATURE_AND_TRUSTED_KEY')
     if packet.get('scientific_novelty_verified') is not True:

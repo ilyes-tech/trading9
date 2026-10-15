@@ -197,9 +197,15 @@ def verify_signed_initial_review(packet_path, review_path, signature_path, trust
             'packet_sha256': hashlib.sha256(packet_bytes).hexdigest(),
             'protocol_sha256': evidence['protocol']['sha256'],
             'instrument': 'BINANCE_COINM_BTCUSD_PERP',
-            'decision': 'ELIGIBLE_FOR_SCIENTIFIC_INITIAL_REVIEW_ONLY',
         }
-        if not isinstance(payload, dict) or any(payload.get(k) != v for k, v in expected.items()):
+        allowed_decisions = {
+            'ELIGIBLE_FOR_SCIENTIFIC_INITIAL_REVIEW_ONLY',
+            'REJECT_REDUNDANT_MECHANISM',
+            'REJECT_INSUFFICIENT_SOURCE',
+            'REQUEST_FIXED_DEFINITION',
+        }
+        if (not isinstance(payload, dict) or any(payload.get(k) != v for k, v in expected.items())
+                or payload.get('decision') not in allowed_decisions):
             return result('DENY_INITIAL_REVIEW_SIGNATURE_BINDING')
         if not isinstance(payload.get('reviewer_id'), str) or not payload['reviewer_id'].strip():
             return result('DENY_INITIAL_REVIEW_REVIEWER_ID')
@@ -219,6 +225,8 @@ def verify_signed_initial_review(packet_path, review_path, signature_path, trust
                                     '-rawin','-in',str(reviewpath)],capture_output=True,timeout=6)
         if check.returncode != 0:
             return result('DENY_INITIAL_REVIEW_SIGNATURE_INVALID')
-        return result('INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED')
+        if payload['decision'] == 'ELIGIBLE_FOR_SCIENTIFIC_INITIAL_REVIEW_ONLY':
+            return result('INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED')
+        return result('SIGNED_INITIAL_REVIEW_' + payload['decision'] + '_NOT_AUTHORIZED')
     except (OSError, ValueError, TypeError, UnicodeError, subprocess.TimeoutExpired):
         return result('DENY_INITIAL_REVIEW_UNREADABLE')

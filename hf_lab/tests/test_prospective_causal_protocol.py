@@ -355,6 +355,21 @@ def test_initial_external_signature_binding_is_review_only(tmp_path):
     assert out['status']=='INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED'
     assert all(out[k] is False for k in ('research_execution_authorized','causal_novelty_proven',
                                          'independent_replication_proven','orders_allowed','mt5_allowed'))
+    for decision in ('REJECT_REDUNDANT_MECHANISM','REJECT_INSUFFICIENT_SOURCE',
+                     'REQUEST_FIXED_DEFINITION'):
+        values['decision']=decision
+        review.write_text(json.dumps(values,sort_keys=True))
+        subprocess.run(['/usr/bin/openssl','pkeyutl','-sign','-inkey',str(private),
+                        '-rawin','-in',str(review),'-out',str(sig)],
+                       check=True,capture_output=True)
+        result=verify(packet,review,sig,public)
+        assert result['status']=='SIGNED_INITIAL_REVIEW_'+decision+'_NOT_AUTHORIZED'
+        assert result['research_execution_authorized'] is False
+        assert result['independent_replication_proven'] is False
+    values['decision']='ELIGIBLE_FOR_SCIENTIFIC_INITIAL_REVIEW_ONLY'
+    review.write_text(json.dumps(values,sort_keys=True))
+    subprocess.run(['/usr/bin/openssl','pkeyutl','-sign','-inkey',str(private),
+                    '-rawin','-in',str(review),'-out',str(sig)],check=True,capture_output=True)
     (folder/'regimes.json').write_text('tampered')
     assert verify(packet,review,sig,public)['status']=='DENY_INITIAL_REVIEW_EVIDENCE_TAMPERED'
     (folder/'regimes.json').write_text(json.dumps(dict(test_only=True,evidence_type='regimes')))
@@ -500,3 +515,13 @@ def test_preexperiment_nontrading_cost_gate_is_separate():
     docs['live']['liquidation_event_payload_validated']=False
     docs['historical_quotes']['quotes_are_proven_received_at_decision_time']=True
     assert check(packet,docs,'DENIED')['missing_prerequisites']==['LOCAL_FEED_ATTESTATION_NOT_INDEPENDENT']
+    docs['historical_quotes']['quotes_are_proven_received_at_decision_time']=False
+    for status in ('SIGNED_INITIAL_REVIEW_REJECT_REDUNDANT_MECHANISM_NOT_AUTHORIZED',
+                   'SIGNED_INITIAL_REVIEW_REJECT_INSUFFICIENT_SOURCE_NOT_AUTHORIZED'):
+        rejected=check(packet,docs,status)
+        assert rejected['status']=='PREEXPERIMENT_REJECTED_BY_INDEPENDENT_REVIEW'
+        assert rejected['development_experiment_authorized'] is False
+        assert rejected['missing_prerequisites']==[status]
+    revised=check(packet,docs,'SIGNED_INITIAL_REVIEW_REQUEST_FIXED_DEFINITION_NOT_AUTHORIZED')
+    assert revised['status']=='PREEXPERIMENT_REVISION_REQUESTED_BY_INDEPENDENT_REVIEW'
+    assert revised['new_research_authorized'] is False
