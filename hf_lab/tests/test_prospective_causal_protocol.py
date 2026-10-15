@@ -486,3 +486,17 @@ def test_preexperiment_nontrading_cost_gate_is_separate():
     assert out['development_experiment_authorized'] is False and out['orders_allowed'] is False
     packet['orders_allowed']=True
     assert check(packet,docs,'DENIED')['status']=='PREEXPERIMENT_INPUT_REJECTED'
+    packet['orders_allowed']=False
+    for claim in ('scientific_novelty_verified','independently_attested_future_preregistration',
+                  'reviewed_bounded_development_budget','approved_information_timing_controls'):
+        packet[claim]=True
+        verdict=check(packet,docs,'INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED')
+        assert verdict['status']=='PREEXPERIMENT_INPUT_REJECTED'
+        assert verdict['missing_prerequisites']==['APPLICANT_SELF_ATTESTED_SCIENCE']
+        assert verdict['development_experiment_authorized'] is False
+        packet.pop(claim)
+    docs['live']['liquidation_event_payload_validated']=True
+    assert check(packet,docs,'DENIED')['missing_prerequisites']==['LOCAL_FEED_ATTESTATION_NOT_INDEPENDENT']
+    docs['live']['liquidation_event_payload_validated']=False
+    docs['historical_quotes']['quotes_are_proven_received_at_decision_time']=True
+    assert check(packet,docs,'DENIED')['missing_prerequisites']==['LOCAL_FEED_ATTESTATION_NOT_INDEPENDENT']

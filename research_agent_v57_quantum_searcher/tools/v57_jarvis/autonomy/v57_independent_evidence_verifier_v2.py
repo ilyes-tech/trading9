@@ -390,6 +390,17 @@ def stage03_preexperiment_readiness(packet, sources, external_review_status):
     live=sources['live']
     prices=sources['costs']
     quotes=sources['historical_quotes']
+    # Local dossier flags and locally hashed samples are not independent attestations.
+    # A signed eligibility-for-review letter is not an attestation of science.
+    if any(packet.get(k) is True for k in (
+            'scientific_novelty_verified',
+            'independently_attested_future_preregistration',
+            'reviewed_bounded_development_budget',
+            'approved_information_timing_controls')):
+        return result('PREEXPERIMENT_INPUT_REJECTED', ['APPLICANT_SELF_ATTESTED_SCIENCE'])
+    if (live.get('liquidation_event_payload_validated') is True
+            or quotes.get('quotes_are_proven_received_at_decision_time') is True):
+        return result('PREEXPERIMENT_INPUT_REJECTED', ['LOCAL_FEED_ATTESTATION_NOT_INDEPENDENT'])
     if (protocol.get('kind')!='V57_PROSPECTIVE_CAUSAL_PROTOCOL_V1'
             or protocol.get('hypothesis_status')!='FORMULATED_FOR_REVIEW'
             or review.get('status')!='PROTOCOL_REVIEW_REQUIRED_NOT_AUTHORIZED'
