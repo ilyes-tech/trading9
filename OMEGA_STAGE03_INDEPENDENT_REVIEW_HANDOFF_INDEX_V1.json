@@ -38,6 +38,7 @@
     "Resolve independent timestamp custody, forceOrder observations and a future untouched 20-percent holdout before authorizing any market experiment.",
     "Return signed review through separate trusted authority; signature is not scientific admission or execution permission."
   ],
+  "required_signed_review_addendum_field": "supplemental_review_index_sha256",
   "research_execution_authorized": false,
   "review_decision": "PENDING_INDEPENDENT_EXTERNAL_REVIEW",
   "review_packet_sha256": "83f8ba8a347a897a36a3ed9d241727ce7cc9cfe437074e05a207f0c1e27165fa",
@@ -58,6 +59,7 @@
   "scope": "EXTERNAL_REVIEW_OF_ONE_COINM_BTCUSD_PERP_NONTRADING_FIRST_EXPERIMENT_ONLY",
   "search_gate_sha256": "d8b80a706bb26e02948b1d6bcdb5aae686f2906eb1e77a8e8648bb50ec5d8979",
   "search_started": false,
+  "signed_review_addendum_instructions": "Independent reviewer computes SHA-256 of this exact final index JSON and includes that hex digest as supplemental_review_index_sha256 in the signed external_initial_review_v1.json. The signed initial review must match BOTH original packet and this index; two new probe hashes are verified against original files. A signed eligibility letter still NEVER authorizes research.",
   "source_verification": {
     "full_sequence_and_cross_stream_timing_attested": false,
     "future_preregistered_capture_available": false,

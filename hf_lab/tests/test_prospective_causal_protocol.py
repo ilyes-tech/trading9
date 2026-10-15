@@ -360,6 +360,55 @@ def test_initial_external_signature_binding_is_review_only(tmp_path):
     assert out['status']=='INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED'
     assert all(out[k] is False for k in ('research_execution_authorized','causal_novelty_proven',
                                          'independent_replication_proven','orders_allowed','mt5_allowed'))
+    # A real initial review must also bind both newer public-source probes.
+    supplemental_names={
+        'bounded_coinm_depth10_12_seconds': 'coinm_symbol_specific_l2_public_source_probe_v1.json',
+        'bounded_coinm_depth10_and_forceorder_45_seconds': 'coinm_target_liquidation_channel_one_shot_v1.json',
+    }
+    supplementary={}
+    for key,filename in supplemental_names.items():
+        source=folder/filename
+        source.write_text(json.dumps({'kind':'TEST_ONLY_PUBLIC_SOURCE','sample':key}))
+        supplementary[key]=hashlib.sha256(source.read_bytes()).hexdigest()
+    index=tmp_path/'supplement-index.json'
+    index_values=dict(
+        kind='OMEGA_STAGE03_INDEPENDENT_REVIEW_HANDOFF_INDEX_V1',
+        review_packet_sha256=hashlib.sha256(packet.read_bytes()).hexdigest(),
+        preexperiment_protocol_sha256=evidence['protocol']['sha256'],
+        review_packet_verified_eight_source_digests={k:v['sha256'] for k,v in evidence.items()},
+        source_verification=dict(symbol='BTCUSD_PERP',venue='BINANCE_COINM'),
+        supplemental_evidence_not_bound_to_original_packet_signature=True,
+        supplemental_evidence_sha256=supplementary,
+        independent_reviewer_signed=False,scientific_admission=False,
+        development_experiment_authorized=False,orders_allowed=False,
+        mt5_allowed=False,holdout_allowed=False,auto_promotion_allowed=False)
+    index.write_text(json.dumps(index_values,sort_keys=True))
+    assert verify(packet,review,sig,public,index)['status']=='DENY_INITIAL_REVIEW_SIGNATURE_BINDING'
+    values['supplemental_review_index_sha256']=hashlib.sha256(index.read_bytes()).hexdigest()
+    review.write_text(json.dumps(values,sort_keys=True))
+    subprocess.run(['/usr/bin/openssl','pkeyutl','-sign','-inkey',str(private),
+                    '-rawin','-in',str(review),'-out',str(sig)],check=True,capture_output=True)
+    assert verify(packet,review,sig,public,index)['status']=='INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED'
+    first=folder/supplemental_names['bounded_coinm_depth10_12_seconds']
+    original=first.read_bytes()
+    first.write_bytes(b'bad')
+    assert verify(packet,review,sig,public,index)['status']=='DENY_INITIAL_REVIEW_SUPPLEMENT_TAMPERED'
+    first.write_bytes(original)
+    index_values['source_verification']['symbol']='BTCUSDT'
+    index.write_text(json.dumps(index_values,sort_keys=True))
+    assert verify(packet,review,sig,public,index)['status']=='DENY_INITIAL_REVIEW_SUPPLEMENT_BINDING'
+    index_values['source_verification']['symbol']='BTCUSD_PERP'
+    index_values['review_packet_verified_eight_source_digests']['protocol']='0'*64
+    index.write_text(json.dumps(index_values,sort_keys=True))
+    assert verify(packet,review,sig,public,index)['status']=='DENY_INITIAL_REVIEW_SUPPLEMENT_BINDING'
+    index_values['review_packet_verified_eight_source_digests']['protocol']=evidence['protocol']['sha256']
+    index_values['note']='TAMPERED_AFTER_REVIEW_SIGNATURE'
+    index.write_text(json.dumps(index_values,sort_keys=True))
+    assert verify(packet,review,sig,public,index)['status']=='DENY_INITIAL_REVIEW_SIGNATURE_BINDING'
+    del values['supplemental_review_index_sha256']
+    review.write_text(json.dumps(values,sort_keys=True))
+    subprocess.run(['/usr/bin/openssl','pkeyutl','-sign','-inkey',str(private),
+                    '-rawin','-in',str(review),'-out',str(sig)],check=True,capture_output=True)
     for decision in ('REJECT_REDUNDANT_MECHANISM','REJECT_INSUFFICIENT_SOURCE',
                      'REQUEST_FIXED_DEFINITION'):
         values['decision']=decision

@@ -117,7 +117,7 @@ if __name__ == '__main__':
         sys.exit(3)
 
 
-def verify_signed_initial_review(packet_path, review_path, signature_path, trust_key_path):
+def verify_signed_initial_review(packet_path, review_path, signature_path, trust_key_path, supplemental_index_path=None):
     """Validate independent *initial* review only. Never approve experiments or final admission.
 
     The externally controlled Ed25519 public key must be provisioned outside the
@@ -191,7 +191,41 @@ def verify_signed_initial_review(packet_path, review_path, signature_path, trust
                 return result('DENY_INITIAL_REVIEW_EVIDENCE_TAMPERED')
         if hashlib.sha256(read_regular(root / evidence['protocol']['relative_file'], 16384)).hexdigest() != evidence['protocol']['sha256']:
             return result('DENY_INITIAL_REVIEW_PROTOCOL_HASH')
-    except (OSError, ValueError, TypeError, KeyError, UnicodeError):
+        supplemental_index_sha256 = None
+        if supplemental_index_path is not None:
+            index_bytes = read_regular(supplemental_index_path, 16384)
+            index = json.loads(index_bytes)
+            original_digests = {name: item['sha256'] for name, item in evidence.items()}
+            pairs = {
+                'bounded_coinm_depth10_12_seconds': 'coinm_symbol_specific_l2_public_source_probe_v1.json',
+                'bounded_coinm_depth10_and_forceorder_45_seconds': 'coinm_target_liquidation_channel_one_shot_v1.json',
+            }
+            if (not isinstance(index, dict)
+                    or index.get('kind') != 'OMEGA_STAGE03_INDEPENDENT_REVIEW_HANDOFF_INDEX_V1'
+                    or index.get('review_packet_sha256') != hashlib.sha256(packet_bytes).hexdigest()
+                    or index.get('preexperiment_protocol_sha256') != evidence['protocol']['sha256']
+                    or index.get('review_packet_verified_eight_source_digests') != original_digests
+                    or index.get('source_verification', {}).get('symbol') != 'BTCUSD_PERP'
+                    or index.get('source_verification', {}).get('venue') != 'BINANCE_COINM'
+                    or index.get('supplemental_evidence_not_bound_to_original_packet_signature') is not True
+                    or any(index.get(k) is not False for k in
+                           ('independent_reviewer_signed', 'scientific_admission',
+                            'development_experiment_authorized', 'orders_allowed',
+                            'mt5_allowed', 'holdout_allowed', 'auto_promotion_allowed'))):
+                return result('DENY_INITIAL_REVIEW_SUPPLEMENT_BINDING')
+            extra = index.get('supplemental_evidence_sha256')
+            if not isinstance(extra, dict) or set(extra) != set(pairs):
+                return result('DENY_INITIAL_REVIEW_SUPPLEMENT_BINDING')
+            for name, filename in pairs.items():
+                digest = extra[name]
+                if (not isinstance(digest, str) or len(digest) != 64
+                        or any(c not in '0123456789abcdef' for c in digest)):
+                    return result('DENY_INITIAL_REVIEW_SUPPLEMENT_BINDING')
+                sample = read_regular(root / 'stage03_liquidation_source_access_v1' / filename, 50000)
+                if hashlib.sha256(sample).hexdigest() != digest:
+                    return result('DENY_INITIAL_REVIEW_SUPPLEMENT_TAMPERED')
+            supplemental_index_sha256 = hashlib.sha256(index_bytes).hexdigest()
+    except (OSError, ValueError, TypeError, KeyError, UnicodeError, AttributeError):
         return result('DENY_INITIAL_REVIEW_PACKET_UNREADABLE')
 
     try:
@@ -208,6 +242,8 @@ def verify_signed_initial_review(packet_path, review_path, signature_path, trust
             'protocol_sha256': evidence['protocol']['sha256'],
             'instrument': 'BINANCE_COINM_BTCUSD_PERP',
         }
+        if supplemental_index_sha256 is not None:
+            expected['supplemental_review_index_sha256'] = supplemental_index_sha256
         allowed_decisions = {
             'ELIGIBLE_FOR_SCIENTIFIC_INITIAL_REVIEW_ONLY',
             'REJECT_REDUNDANT_MECHANISM',

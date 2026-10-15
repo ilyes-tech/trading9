@@ -488,7 +488,8 @@ def review_stage03_pending_initial():
         reviewer=ns['verify_signed_initial_review'](
             packet_path,folder/'external_initial_review_v1.json',
             folder/'external_initial_review_v1.sig',
-            Path('/etc/tradingai/omega-scientific-review-pubkey.pem'))
+            Path('/etc/tradingai/omega-scientific-review-pubkey.pem'),
+            Path(__file__).resolve().parents[4] / 'OMEGA_STAGE03_INDEPENDENT_REVIEW_HANDOFF_INDEX_V1.json')
         return stage03_preexperiment_readiness(packet,docs,reviewer['status'])
     except (OSError,ValueError,TypeError,KeyError,UnicodeError,AttributeError):
         return stage03_preexperiment_readiness(None,None,'DENY_EVIDENCE_NOT_INDEPENDENTLY_VERIFIED')
