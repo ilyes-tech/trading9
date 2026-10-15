@@ -10,6 +10,41 @@ SOURCE=S/'stage03_liquidation_source_access_v1/one_source_review_v1.json'
 PREEXPERIMENT=S/'stage03_liquidation_source_access_v1/first_experiment_protocol_review_only_v1.json'
 PREEXPERIMENT_REVIEW=S/'stage03_liquidation_source_access_v1/prospective_causal_protocol_review_v1.json'
 GLOBAL_FORCEORDER=S/'stage03_liquidation_source_access_v1/global_forceorder_market_type_triage_v1.json'
+HISTORICAL=S/'stage03_liquidation_source_access_v1/historical_binance_vision_exploratory/verified_archive_integrity_v1.json'
+
+
+def historical_coinm_archive_integrity_sha256():
+    """Verify archived target data bytes, not prospective timing or scientific admission."""
+    try:
+        if not HISTORICAL.is_file() or HISTORICAL.is_symlink() or HISTORICAL.stat().st_size>20000:
+            return None
+        raw=HISTORICAL.read_bytes()
+        doc=json.loads(raw)
+        archives=doc.get('archives')
+        if (doc.get('kind')!='OMEGA_BINANCE_COINM_BTCUSD_PERP_LIQUIDATION_HISTORICAL_SOURCE_AUDIT_V1'
+                or doc.get('status')!='OFFICIAL_COINM_ARCHIVES_INTEGRITY_VERIFIED_HISTORICAL_DUPLICATES_REVIEW_REQUIRED'
+                or doc.get('market')!='BINANCE_COINM_BTCUSD_PERP'
+                or doc.get('all_official_checksums_pass') is not True
+                or doc.get('first_experiment_data_available') is not False
+                or not isinstance(archives,list) or len(archives)!=2
+                or any(doc.get(k) is not False for k in ('scientifically_independent_review',
+                      'candidate_admitted','research_execution_authorized','search_executed',
+                      'backtest_executed','orders_allowed','mt5_allowed','holdout_allowed','auto_promotion_allowed'))):
+            return None
+        for entry in archives:
+            date=entry.get('date')
+            if date not in ('2024-06-15','2024-06-16') or entry.get('official_checksum_validated') is not True:
+                return None
+            if entry.get('identical_duplicate_rows')!=12 or entry.get('unique_timestamp_count')!=12:
+                return None
+            path=HISTORICAL.parent/('BTCUSD_PERP-liquidationSnapshot-'+date+'.zip')
+            if not path.is_file() or path.is_symlink() or path.stat().st_size>100000:
+                return None
+            if hashlib.sha256(path.read_bytes()).hexdigest()!=entry.get('zip_sha256'):
+                return None
+        return hashlib.sha256(raw).hexdigest()
+    except (OSError,ValueError,TypeError,AttributeError):
+        return None
 
 
 def non_target_liquidation_sample_sha256():
@@ -96,19 +131,22 @@ def main():
     public_source_sha256=public_liquidation_source_status()
     preexperiment_sha256=first_experiment_review_status()
     non_target_sample_sha256=non_target_liquidation_sample_sha256()
+    historical_archive_sha256=historical_coinm_archive_integrity_sha256()
     rows=[]
     for p in proposals['proposals']:
         assert p['market']=='BTCUSD' and p['execution_authorized'] is False
         title=p['source_title'].lower()
         if any(term in title for term in ('liquidation','displayed depth','hidden liquidity','market making','quoting')):
-            classification=('PARTIAL_PUBLIC_FUTURES_BOOK_AVAILABLE_LIQUIDATION_DATA_NOT_VERIFIED'
+            classification=('TARGET_HISTORICAL_COINM_LIQUIDATION_ARCHIVES_VERIFIED_NOT_PROSPECTIVE'
+                            if historical_archive_sha256 else
+                            'PARTIAL_PUBLIC_FUTURES_BOOK_AVAILABLE_LIQUIDATION_DATA_NOT_VERIFIED'
                             if public_source_sha256 else 'REQUIRES_UNAVAILABLE_LIQUIDATION_OR_ORDERBOOK_DATA')
         elif any(term in title for term in ('order flow','microstructure','composite alpha')):
             classification='BAR_LEVEL_PROXY_ONLY_REQUIRES_FEATURE_SPECIFICATION'
         else:
             classification='UNSPECIFIED_MECHANISM_REQUIRES_REVIEW'
         rows.append({'hypothesis_id':p['hypothesis_id'],'source_doi':p['source_doi'],'classification':classification,'status':'NOT_ADMITTED','novelty_verified':False,'execution_authorized':False})
-    result={'kind':'V57_HYPOTHESIS_FEASIBILITY_TRIAGE_V1','status':'PASS_REVIEW_ONLY','reviewed':len(rows),'data_sha256':data['sha256'],'public_futures_book_source_review_sha256':public_source_sha256,'first_experiment_review_only_sha256':preexperiment_sha256,'first_experiment_status':('FORMULATED_FOR_EXTERNAL_PREEXPERIMENT_REVIEW_NOT_AUTHORIZED' if preexperiment_sha256 else 'PREEXPERIMENT_REVIEW_NOT_ESTABLISHED'),'independent_replication_required_for_first_hypothesis_review':False,'independent_replication_required_for_final_admission':True,'non_target_global_liquidation_sample_sha256':non_target_sample_sha256,'non_target_global_liquidation_status':('THREE_USDM_ST1_MESSAGES_OBSERVED_NOT_COINM_BTCUSD_PERP' if non_target_sample_sha256 else 'NO_VALID_NON_TARGET_WS_SAMPLE'),'target_instrument_forceorder_messages_verified':False,'liquidation_observations_verified':False,'independent_replication_verified':False,'items':rows,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
+    result={'kind':'V57_HYPOTHESIS_FEASIBILITY_TRIAGE_V1','status':'PASS_REVIEW_ONLY','reviewed':len(rows),'data_sha256':data['sha256'],'public_futures_book_source_review_sha256':public_source_sha256,'first_experiment_review_only_sha256':preexperiment_sha256,'first_experiment_status':('FORMULATED_FOR_EXTERNAL_PREEXPERIMENT_REVIEW_NOT_AUTHORIZED' if preexperiment_sha256 else 'PREEXPERIMENT_REVIEW_NOT_ESTABLISHED'),'independent_replication_required_for_first_hypothesis_review':False,'independent_replication_required_for_final_admission':True,'non_target_global_liquidation_sample_sha256':non_target_sample_sha256,'non_target_global_liquidation_status':('THREE_USDM_ST1_MESSAGES_OBSERVED_NOT_COINM_BTCUSD_PERP' if non_target_sample_sha256 else 'NO_VALID_NON_TARGET_WS_SAMPLE'),'target_historical_archive_integrity_sha256':historical_archive_sha256,'target_historical_unique_timestamps_checked':(24 if historical_archive_sha256 else 0),'target_historical_archive_role':'EXPLORATORY_SOURCE_INTEGRITY_ONLY_NOT_PROSPECTIVE','target_instrument_forceorder_messages_verified':False,'liquidation_observations_verified':False,'independent_replication_verified':False,'items':rows,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
     tmp=O.with_suffix('.tmp')
     tmp.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
     tmp.replace(O)

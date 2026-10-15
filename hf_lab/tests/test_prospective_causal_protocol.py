@@ -204,3 +204,43 @@ def test_global_forceorder_sample_cannot_be_misclassified_as_target_coinm(tmp_pa
     target.unlink()
     target.symlink_to(tmp_path / 'missing')
     assert check() is None
+
+
+def test_historical_coinm_archive_status_checks_both_bytes_not_new_admission(tmp_path):
+    """Archived source integrity may advance feasibility, never execution."""
+    import hashlib
+    ns = runpy.run_path(str(A / 'v57_hypothesis_feasibility_triage_v1.py'))
+    gate = ns['historical_coinm_archive_integrity_sha256']
+    gate.__globals__['HISTORICAL'] = tmp_path / 'report.json'
+    assert gate() is None
+    files = []
+    for date in ('2024-06-15', '2024-06-16'):
+        name = 'BTCUSD_PERP-liquidationSnapshot-' + date + '.zip'
+        raw = ('test-only-' + date).encode()
+        (tmp_path / name).write_bytes(raw)
+        files.append(dict(date=date, official_checksum_validated=True,
+                          identical_duplicate_rows=12, unique_timestamp_count=12,
+                          zip_sha256=hashlib.sha256(raw).hexdigest()))
+    safe = dict(scientifically_independent_review=False, candidate_admitted=False,
+                research_execution_authorized=False, search_executed=False,
+                backtest_executed=False, orders_allowed=False, mt5_allowed=False,
+                holdout_allowed=False, auto_promotion_allowed=False)
+    doc = dict(kind='OMEGA_BINANCE_COINM_BTCUSD_PERP_LIQUIDATION_HISTORICAL_SOURCE_AUDIT_V1',
+               status='OFFICIAL_COINM_ARCHIVES_INTEGRITY_VERIFIED_HISTORICAL_DUPLICATES_REVIEW_REQUIRED',
+               market='BINANCE_COINM_BTCUSD_PERP',
+               all_official_checksums_pass=True,
+               first_experiment_data_available=False, archives=files, **safe)
+    raw = json.dumps(doc).encode()
+    (tmp_path / 'report.json').write_bytes(raw)
+    assert gate() == hashlib.sha256(raw).hexdigest()
+    (tmp_path / 'BTCUSD_PERP-liquidationSnapshot-2024-06-16.zip').write_bytes(b'tampered')
+    assert gate() is None
+    (tmp_path / 'BTCUSD_PERP-liquidationSnapshot-2024-06-16.zip').write_bytes(b'test-only-2024-06-16')
+    doc['candidate_admitted'] = True
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    assert gate() is None
+    doc['candidate_admitted'] = False
+    (tmp_path / 'report.json').write_text(json.dumps(doc))
+    (tmp_path / 'report.json').unlink()
+    (tmp_path / 'report.json').symlink_to(tmp_path / 'report-elsewhere')
+    assert gate() is None
