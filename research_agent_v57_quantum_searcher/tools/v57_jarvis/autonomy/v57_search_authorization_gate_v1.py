@@ -8,7 +8,14 @@ def main():
  o=load('bounded_objective_v1.json');t=load('tool_selection_v1.json');r=load('resume_validation_v1.json')
  causal=load('causal_family_admission_v2.json');evidence=load('independent_evidence_verifier_v2.json')
  reasons=[]
- if causal.get('independent_evidence_verifier')=='NOT_IMPLEMENTED':reasons.append('INDEPENDENT_SCIENTIFIC_VERIFIER_NOT_IMPLEMENTED')
+ if causal.get('independent_evidence_verifier')!='TECHNICAL_VERIFIER_CONNECTED_NOT_SCIENTIFIC_ADMISSION':
+  reasons.append('TECHNICAL_EVIDENCE_VERIFIER_NOT_VERIFIED')
+ # The existing V2 verifier proves structural/numeric checks, not independent science.
+ # Deliberately deny admission until a separately reviewed signed authorization
+ # mechanism is implemented and tested; self-reported JSON flags never suffice.
+ if causal.get('scientific_independent_admission')!='NOT_ESTABLISHED':
+  reasons.append('UNTRUSTED_SCIENTIFIC_ADMISSION_STATUS')
+ reasons.append('INDEPENDENT_SCIENTIFIC_ADMISSION_NOT_AVAILABLE')
  source=S/'multimarket_evidence_registry_v3.json';coverage=S/'native_capability_coverage_v2.json'
  try:
   if source.is_symlink() or evidence.get('source_sha256')!=hashlib.sha256(source.read_bytes()).hexdigest():reasons.append('EVIDENCE_PROVENANCE_INVALID')
@@ -22,7 +29,7 @@ def main():
  if r.get('decision') not in {'IDLE','SAFE_RESUME'}: reasons.append('RESUME_STATE_UNSAFE')
  # Phase-2 gate is authorization-only. It never launches the searcher itself.
  admitted=not reasons
- out={'schema_version':1,'kind':'JARVIS_SEARCH_AUTHORIZATION_GATE_V1','status':'AUTHORIZED' if admitted else 'DENIED','reasons':reasons,'authorized':admitted,'max_candidates':4 if admitted else 0,'next_required_capability':'IMPLEMENT_INDEPENDENT_SCIENTIFIC_EVALUATION' if 'INDEPENDENT_SCIENTIFIC_VERIFIER_NOT_IMPLEMENTED' in reasons else None,'execution_started':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
+ out={'schema_version':1,'kind':'JARVIS_SEARCH_AUTHORIZATION_GATE_V1','status':'AUTHORIZED' if admitted else 'DENIED','reasons':reasons,'authorized':admitted,'max_candidates':4 if admitted else 0,'next_required_capability':'VERIFY_INTEGRATED_TECHNICAL_EVIDENCE_PIPELINE' if 'TECHNICAL_EVIDENCE_VERIFIER_NOT_VERIFIED' in reasons else 'OBTAIN_EXTERNAL_SCIENTIFIC_REVIEW_AND_PROSPECTIVE_EVIDENCE','execution_started':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
  review=evidence.get('replay_review')
  out['replay_review_status']=review.get('status') if isinstance(review,dict) else 'REVIEW_NOT_REPORTED'
  out['replay_review_reason']=review.get('reason') if isinstance(review,dict) else None

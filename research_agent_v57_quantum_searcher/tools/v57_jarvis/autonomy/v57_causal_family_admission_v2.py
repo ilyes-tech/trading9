@@ -170,13 +170,48 @@ def review_submitted_candidate(coverage, registry):
     except (OSError,ValueError,TypeError,KeyError,RecursionError) as error:
         return result('REJECT','UNREADABLE_OR_INVALID_DOSSIER',detail=str(error)[:160])
 
+def technical_verifier_status():
+    """Check that the existing mechanical verifier was run and bound to the registry.
+
+    This is an engineering-integrity check, never a scientific attestation.
+    """
+    registry = S / "multimarket_evidence_registry_v3.json"
+    artifact = S / "independent_evidence_verifier_v2.json"
+    try:
+        if any(p.is_symlink() or not p.is_file() or not 0 < p.stat().st_size <= 50000
+               for p in (registry, artifact)):
+            return "TECHNICAL_VERIFIER_NOT_VERIFIED"
+        evidence = json.loads(artifact.read_bytes())
+        readiness = evidence.get("stage03_initial_readiness")
+        required = ("trade_robustness_evaluation_supported", "trade_cost_arithmetic_supported",
+                    "temporal_metadata_checks_supported", "composed_replay_review_supported",
+                    "source_schema_checked")
+        safe = ("orders_allowed", "mt5_allowed", "holdout_allowed", "auto_promotion_allowed",
+                "new_research_authorized", "causal_novelty_proven")
+        if (not isinstance(readiness, dict)
+                or readiness.get("kind") != "OMEGA_STAGE03_PREEXPERIMENT_READINESS_V1"
+                or readiness.get("development_experiment_authorized") is not False
+                or any(readiness.get(k) is not False for k in
+                       ("orders_allowed", "mt5_allowed", "holdout_allowed", "auto_promotion_allowed",
+                        "new_research_authorized", "causal_novelty_proven"))
+                or evidence.get("kind") != "V57_INDEPENDENT_EVIDENCE_VERIFIER_V2"
+                or evidence.get("status") != "PASS"
+                or evidence.get("source_sha256") != hashlib.sha256(registry.read_bytes()).hexdigest()
+                or any(evidence.get(k) is not True for k in required)
+                or any(evidence.get(k) is not False for k in safe)):
+            return "TECHNICAL_VERIFIER_NOT_VERIFIED"
+        return "TECHNICAL_VERIFIER_CONNECTED_NOT_SCIENTIFIC_ADMISSION"
+    except (OSError, ValueError, TypeError, AttributeError):
+        return "TECHNICAL_VERIFIER_NOT_VERIFIED"
+
+
 def main():
  p=S/"native_capability_coverage_v2.json";v=json.loads(p.read_text())
  if v.get("kind")!="V57_NATIVE_CAPABILITY_COVERAGE_V2" or v.get("status")!="PASS" or len(v.get("exhausted_families",[]))!=5:raise RuntimeError("COVERAGE")
  exhausted=set(v["exhausted_families"]);safe={k:False for k in ("orders_allowed","mt5_allowed","holdout_allowed","auto_promotion_allowed")}
  cases=[({}, "DENY_MISSING_FAMILY"),({"native_family":"momentum",**safe},"DENY_EXHAUSTED_FAMILY"),({"native_family":"new_family","new_causal_evidence_verified":True,**safe},"DENY_UNTRUSTED_SELF_ATTESTATION"),({"native_family":"new_family",**safe},"DENY_NO_INDEPENDENT_EVIDENCE_VERIFIER"),({"native_family":"new_family","orders_allowed":True,**{k:v for k,v in safe.items() if k!="orders_allowed"}},"DENY_UNSAFE")]
  if any(check(x,exhausted)!=expected for x,expected in cases):raise RuntimeError("TESTS")
- doc={"schema_version":1,"kind":"V57_CAUSAL_FAMILY_ADMISSION_V2","status":"PASS","coverage_sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"tests":len(cases),"independent_evidence_verifier":"NOT_IMPLEMENTED","external_signed_review_gate":"ED25519_IMPLEMENTED_FAIL_CLOSED_NOT_SCIENTIFIC_ADMISSION","self_attestation_accepted":False,"new_family_admitted":False,"research_execution_authorized":False,**safe}
+ doc={"schema_version":1,"kind":"V57_CAUSAL_FAMILY_ADMISSION_V2","status":"PASS","coverage_sha256":hashlib.sha256(p.read_bytes()).hexdigest(),"tests":len(cases),"independent_evidence_verifier":technical_verifier_status(),"scientific_independent_admission":"NOT_ESTABLISHED","external_signed_review_gate":"ED25519_IMPLEMENTED_FAIL_CLOSED_NOT_SCIENTIFIC_ADMISSION","self_attestation_accepted":False,"new_family_admitted":False,"research_execution_authorized":False,**safe}
  registry=json.loads((S/"multimarket_evidence_registry_v3.json").read_text())
  doc["candidate_review"]=review_submitted_candidate(v,registry)
  q=S/"causal_family_admission_v2.tmp";q.write_text(json.dumps(doc,sort_keys=True,indent=2)+"\n");q.replace(S/"causal_family_admission_v2.json")
