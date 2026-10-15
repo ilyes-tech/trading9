@@ -1,0 +1,40 @@
+{
+  "auto_promotion_allowed": false,
+  "backtest_started": false,
+  "current_source_sufficient_for_hypothesis": false,
+  "evidence_sha256": {
+    "initial_review_packet_v1": "83f8ba8a347a897a36a3ed9d241727ce7cc9cfe437074e05a207f0c1e27165fa",
+    "paired_public_ws_receipt_v2": "445b5fafdebabeb4468d017cd739b5019cd1dc9219d825786e53c564e0ea78a9"
+  },
+  "execution_authorized": false,
+  "generated_at_utc": "2026-10-15T22:05:30.366891+00:00",
+  "holdout_allowed": false,
+  "kind": "OMEGA_STAGE03_SOURCE_STREAM_COMPATIBILITY_AUDIT_V1",
+  "l1_best_quote_verified": true,
+  "l2_depth_levels_verified": false,
+  "mt5_allowed": false,
+  "note": "This is a local engineering compatibility audit. Stream specification is a reviewer question, not a validated market capture or externally attested evidence.",
+  "observed_bookticker_message_count": 920,
+  "observed_market_type_for_bookticker": 2,
+  "observed_nontarget_usdm_forceorder_message_count": 11,
+  "observed_samples_raw_hash_verified": true,
+  "observed_target_coinm_forceorder_message_count": 0,
+  "orders_allowed": false,
+  "prospective_capture_started": false,
+  "provider_docs": [
+    "https://developers.binance.com/en/docs/products/derivatives-trading-coin-futures/websocket-market-streams/Connect",
+    "https://developers.binance.com/en/docs/catalog/core-trading-derivatives-trading-coin-m-futures/api/ws-streams/public"
+  ],
+  "purpose": "One prior public 42s observation: inspect provenance and information depth before any prospectively approved study",
+  "recommended_external_protocol_review": [
+    "Confirm official current market-liquidation stream for exact COIN-M BTCUSD_PERP; do not equate global USD-M forceOrder with target contract",
+    "Specify exact symbol-specific book-depth stream and REST snapshot reconciliation sequence, gap handling and timestamp custody before prospective collection",
+    "Independently pre-register fixed nontrading event window and cost-free quote-displacement outcome before collecting 10+ future UTC days",
+    "Require separate external signed scientific review and explicit bounded-experiment authorization; no retrospective use of 2024 archives as holdout"
+  ],
+  "schema_version": 1,
+  "scientific_admission": false,
+  "search_started": false,
+  "source_contract_for_hypothesis": "PUBLIC_FORCEORDER_RECEIPT_PLUS_AT_LEAST_10_LEVEL_L2_RESTING_DEPTH_WITH_VERIFIABLE_DECISION_CHRONOLOGY",
+  "target": "BINANCE_COINM_BTCUSD_PERP"
+}
