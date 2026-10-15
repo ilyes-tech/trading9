@@ -364,9 +364,11 @@ def stage03_preexperiment_readiness(packet, sources, external_review_status):
     safe = dict(new_research_authorized=False, causal_novelty_proven=False,
                 independent_replication_proven=False, orders_allowed=False,
                 mt5_allowed=False, holdout_allowed=False, auto_promotion_allowed=False)
-    def result(status, missing):
+    def result(status, missing, tradeability=None):
         return dict(kind='OMEGA_STAGE03_PREEXPERIMENT_READINESS_V1', status=status,
                     missing_prerequisites=missing, external_review_status=external_review_status,
+                    secondary_tradability_blockers=tradeability or [],
+                    experiment_scope='NONTRADING_NEXT_300S_MIDQUOTE_FORECAST_ONLY',
                     development_experiment_authorized=False, **safe)
     if not isinstance(packet, dict) or not isinstance(sources, dict):
         return result('PREEXPERIMENT_INPUT_REJECTED', ['INVALID_REVIEW_BUNDLE'])
@@ -408,9 +410,13 @@ def stage03_preexperiment_readiness(packet, sources, external_review_status):
         missing.append('TARGET_COINM_LIVE_FORCEORDER_RECEIPT_AND_GAP_PROVENANCE')
     if quotes.get('quotes_are_proven_received_at_decision_time') is not True:
         missing.append('REALTIME_BOOK_AND_LIQUIDATION_INFORMATION_CHRONOLOGY')
+    # The first nontrading experiment measures quote displacement, not P&L.
+    # Do not demand live broker fills before even observing the hypothesis.
+    # Real costs remain mandatory before ANY tradable/PF interpretation.
+    tradeability=[]
     if (prices.get('reference_regular_fee_schedule',{}).get('account_fee_tier_verified') is not True
             or quotes.get('broker_fills_verified') is not True):
-        missing.append('VENUE_ACCOUNT_COSTS_AND_EXECUTABLE_FILL_SEMANTICS')
+        tradeability.append('VENUE_ACCOUNT_COSTS_AND_EXECUTABLE_FILL_SEMANTICS')
     if packet.get('independently_attested_future_preregistration') is not True:
         missing.append('INDEPENDENTLY_ATTESTED_FUTURE_PREREGISTRATION')
     if packet.get('reviewed_bounded_development_budget') is not True:
@@ -419,7 +425,8 @@ def stage03_preexperiment_readiness(packet, sources, external_review_status):
         missing.append('FALSIFIABLE_INFORMATION_TIMING_AND_CONTROL_DESIGN_REVIEW')
     # A machine-readable checklist is evidence assessment, not permission.
     return result('PREEXPERIMENT_SCIENCE_BLOCKED' if missing else
-                  'PREEXPERIMENT_EVIDENCE_COMPLETE_REQUIRES_SEPARATE_PERMISSION',missing)
+                  'PREEXPERIMENT_EVIDENCE_COMPLETE_REQUIRES_SEPARATE_PERMISSION',
+                  missing,tradeability)
 
 
 def review_stage03_pending_initial():

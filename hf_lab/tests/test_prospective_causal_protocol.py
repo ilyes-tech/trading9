@@ -458,3 +458,31 @@ def test_initial_scientific_readiness_is_fail_closed():
     assert bad['orders_allowed'] is False
     assert bad['mt5_allowed'] is False
     assert bad['holdout_allowed'] is False
+
+
+def test_preexperiment_nontrading_cost_gate_is_separate():
+    """A first quote forecast needs source chronology, not broker fills."""
+    check=runpy.run_path(str(A/'v57_independent_evidence_verifier_v2.py'))['stage03_preexperiment_readiness']
+    packet=dict(kind='OMEGA_STAGE03_EXTERNAL_PREEXPERIMENT_REVIEW_HANDOFF_V1',
+      status='READY_FOR_EXTERNAL_REVIEW_ONLY',instrument='BINANCE_COINM_BTCUSD_PERP',
+      development_authorized=False,candidate_admitted=False,search_executed=False,
+      backtest_executed=False,orders_allowed=False,mt5_allowed=False,
+      holdout_allowed=False,auto_promotion_allowed=False)
+    docs=dict(protocol=dict(kind='V57_PROSPECTIVE_CAUSAL_PROTOCOL_V1',
+                            hypothesis_status='FORMULATED_FOR_REVIEW'),
+      review=dict(status='PROTOCOL_REVIEW_REQUIRED_NOT_AUTHORIZED'),
+      regimes=dict(instrument='BINANCE_COINM_BTCUSD_PERP'),
+      temporal=dict(target='BTCUSD_PERP'),other_market=dict(),
+      costs=dict(symbol='BTCUSD_PERP',reference_regular_fee_schedule=dict(account_fee_tier_verified=False)),
+      live=dict(kind='OMEGA_STAGE03_COINM_WS_BOUNDED_ONE_SHOT_OBSERVATION_V1'),
+      historical_quotes=dict(instrument='BINANCE_COINM_BTCUSD_PERP',
+                             quotes_are_proven_received_at_decision_time=False,broker_fills_verified=False))
+    out=check(packet,docs,'DENY_INDEPENDENT_REVIEW_AUTHORITY_NOT_PROVISIONED')
+    assert out['status']=='PREEXPERIMENT_SCIENCE_BLOCKED'
+    assert len(out['missing_prerequisites'])==7
+    assert out['secondary_tradability_blockers']==['VENUE_ACCOUNT_COSTS_AND_EXECUTABLE_FILL_SEMANTICS']
+    assert 'VENUE_ACCOUNT_COSTS_AND_EXECUTABLE_FILL_SEMANTICS' not in out['missing_prerequisites']
+    assert out['experiment_scope']=='NONTRADING_NEXT_300S_MIDQUOTE_FORECAST_ONLY'
+    assert out['development_experiment_authorized'] is False and out['orders_allowed'] is False
+    packet['orders_allowed']=True
+    assert check(packet,docs,'DENIED')['status']=='PREEXPERIMENT_INPUT_REJECTED'
