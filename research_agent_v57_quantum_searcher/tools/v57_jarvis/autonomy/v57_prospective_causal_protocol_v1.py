@@ -166,6 +166,16 @@ def verify_signed_initial_review(packet_path, review_path, signature_path, trust
         allowed = required | {'historical_quotes'}
         if not isinstance(evidence, dict) or not required.issubset(evidence) or set(evidence) - allowed:
             return result('DENY_INITIAL_REVIEW_EVIDENCE_SCHEMA')
+        proposed = packet.get('development_protocol_proposal_for_independent_review')
+        if proposed is not None:
+            decisions = proposed.get('independent_reviewer_can_choose') if isinstance(proposed, dict) else None
+            permitted = {'ELIGIBLE_FOR_SCIENTIFIC_INITIAL_REVIEW_ONLY',
+                         'REJECT_REDUNDANT_MECHANISM', 'REJECT_INSUFFICIENT_SOURCE',
+                         'REQUEST_FIXED_DEFINITION'}
+            if (not isinstance(decisions, list) or len(decisions) != len(permitted)
+                    or any(not isinstance(x, str) for x in decisions)
+                    or set(decisions) != permitted):
+                return result('DENY_INITIAL_REVIEW_PACKET_DECISION_MISMATCH')
         root = Path(packet_path).parent.parent
         for entry in evidence.values():
             if not isinstance(entry, dict) or set(entry) != {'relative_file', 'sha256'}:

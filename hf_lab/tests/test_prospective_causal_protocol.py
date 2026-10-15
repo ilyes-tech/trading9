@@ -330,7 +330,12 @@ def test_initial_external_signature_binding_is_review_only(tmp_path):
                        verified_source_files=evidence, development_authorized=False,
                        candidate_admitted=False, search_executed=False, backtest_executed=False,
                        orders_allowed=False, mt5_allowed=False, holdout_allowed=False,
-                       auto_promotion_allowed=False)
+                       auto_promotion_allowed=False,
+                       development_protocol_proposal_for_independent_review={
+                           'independent_reviewer_can_choose': [
+                               'REJECT_REDUNDANT_MECHANISM', 'REJECT_INSUFFICIENT_SOURCE',
+                               'REQUEST_FIXED_DEFINITION',
+                               'ELIGIBLE_FOR_SCIENTIFIC_INITIAL_REVIEW_ONLY']})
     packet.write_text(json.dumps(packet_data))
     private=tmp_path/'synthetic-only-private.pem'
     public=tmp_path/'synthetic-only-public.pem'
@@ -378,6 +383,9 @@ def test_initial_external_signature_binding_is_review_only(tmp_path):
     assert verify(packet,review,sig,public)['status']=='DENY_INITIAL_REVIEW_SIGNATURE_INVALID'
     public.chmod(0o666)
     assert verify(packet,review,sig,public)['status']=='DENY_INDEPENDENT_REVIEW_AUTHORITY_NOT_PROVISIONED'
+    packet_data['development_protocol_proposal_for_independent_review']['independent_reviewer_can_choose'][-1] = 'OUTDATED_REVIEW_CODE'
+    packet.write_text(json.dumps(packet_data))
+    assert verify(packet,review,sig,public)['status']=='DENY_INITIAL_REVIEW_PACKET_DECISION_MISMATCH'
 
 
 def test_initial_external_review_requires_real_trust_key_and_safe_packet(tmp_path):
