@@ -446,3 +446,15 @@ def test_historical_top_of_book_audit_is_byte_bound_not_execution(tmp_path):
     report_path.write_text(json.dumps(report))
     checksum.write_text('0'*64+'  file.zip\n')
     assert gate() is None
+
+
+def test_initial_scientific_readiness_is_fail_closed():
+    ns=runpy.run_path(str(A/'v57_independent_evidence_verifier_v2.py'))
+    check=ns['stage03_preexperiment_readiness']
+    bad=check(None,None,'DENY_MISSING_REVIEW')
+    assert bad['status']=='PREEXPERIMENT_INPUT_REJECTED'
+    assert bad['new_research_authorized'] is False
+    assert bad['development_experiment_authorized'] is False
+    assert bad['orders_allowed'] is False
+    assert bad['mt5_allowed'] is False
+    assert bad['holdout_allowed'] is False

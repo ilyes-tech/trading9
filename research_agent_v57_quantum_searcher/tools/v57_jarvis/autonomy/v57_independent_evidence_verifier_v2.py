@@ -352,8 +352,122 @@ def main():
  if any(verify(x)!=expected for x,expected in cases):raise RuntimeError("TESTS")
  doc={"schema_version":1,"kind":"V57_INDEPENDENT_EVIDENCE_VERIFIER_V2","status":"PASS","tests":len(cases),"allowlisted_sources":list(ALLOW),"source_sha256":h,"source_schema_checked":True,"trade_robustness_evaluation_supported":True,"trade_cost_arithmetic_supported":True,"temporal_metadata_checks_supported":True,"composed_replay_review_supported":True,"causal_novelty_proven":False,"new_research_authorized":False,"orders_allowed":False,"mt5_allowed":False,"holdout_allowed":False,"auto_promotion_allowed":False}
  doc["replay_review"]=review_pending_replay()
+ doc["stage03_initial_readiness"]=review_stage03_pending_initial()
  q=S/"independent_evidence_verifier_v2.tmp";q.write_text(json.dumps(doc,sort_keys=True,indent=2)+"\n");q.replace(S/"independent_evidence_verifier_v2.json")
  print("ALL PASS|INDEPENDENT_EVIDENCE_VERIFIER_V2|TESTS=4|ALLOWLIST=1|NOVELTY=NO")
-if __name__=="__main__":
- try:main()
- except Exception as e:print("STOP|FAIL|INDEPENDENT_EVIDENCE_VERIFIER_V2|"+str(e));sys.exit(3)
+def stage03_preexperiment_readiness(packet, sources, external_review_status):
+    """Explain the next real science gap. This assessment NEVER authorizes execution.
+
+    Inputs are treated as untrusted; callers must check source hashes separately.
+    Signing a review is not evidence of a new causal mechanism or safe execution.
+    """
+    safe = dict(new_research_authorized=False, causal_novelty_proven=False,
+                independent_replication_proven=False, orders_allowed=False,
+                mt5_allowed=False, holdout_allowed=False, auto_promotion_allowed=False)
+    def result(status, missing):
+        return dict(kind='OMEGA_STAGE03_PREEXPERIMENT_READINESS_V1', status=status,
+                    missing_prerequisites=missing, external_review_status=external_review_status,
+                    development_experiment_authorized=False, **safe)
+    if not isinstance(packet, dict) or not isinstance(sources, dict):
+        return result('PREEXPERIMENT_INPUT_REJECTED', ['INVALID_REVIEW_BUNDLE'])
+    if (packet.get('kind') != 'OMEGA_STAGE03_EXTERNAL_PREEXPERIMENT_REVIEW_HANDOFF_V1'
+            or packet.get('status') != 'READY_FOR_EXTERNAL_REVIEW_ONLY'
+            or packet.get('instrument') != 'BINANCE_COINM_BTCUSD_PERP'
+            or any(packet.get(k) is not False for k in (
+                'development_authorized','candidate_admitted','search_executed',
+                'backtest_executed','orders_allowed','mt5_allowed','holdout_allowed',
+                'auto_promotion_allowed'))):
+        return result('PREEXPERIMENT_INPUT_REJECTED', ['UNSAFE_OR_INCOMPATIBLE_PACKET'])
+    required={'protocol','review','regimes','temporal','costs','live','other_market','historical_quotes'}
+    if set(sources)!=required or any(not isinstance(sources[k],dict) for k in required):
+        return result('PREEXPERIMENT_INPUT_REJECTED', ['INCOMPLETE_VERIFIED_EVIDENCE_SET'])
+    protocol=sources['protocol']
+    review=sources['review']
+    regimes=sources['regimes']
+    temporal=sources['temporal']
+    live=sources['live']
+    prices=sources['costs']
+    quotes=sources['historical_quotes']
+    if (protocol.get('kind')!='V57_PROSPECTIVE_CAUSAL_PROTOCOL_V1'
+            or protocol.get('hypothesis_status')!='FORMULATED_FOR_REVIEW'
+            or review.get('status')!='PROTOCOL_REVIEW_REQUIRED_NOT_AUTHORIZED'
+            or regimes.get('instrument')!='BINANCE_COINM_BTCUSD_PERP'
+            or temporal.get('target')!='BTCUSD_PERP'
+            or prices.get('symbol')!='BTCUSD_PERP'
+            or quotes.get('instrument')!='BINANCE_COINM_BTCUSD_PERP'
+            or live.get('kind')!='OMEGA_STAGE03_COINM_WS_BOUNDED_ONE_SHOT_OBSERVATION_V1'):
+        return result('PREEXPERIMENT_INPUT_REJECTED', ['INCOMPATIBLE_EVIDENCE_SCHEMA_OR_INSTRUMENT'])
+    missing=[]
+    if external_review_status!='INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED':
+        missing.append('EXTERNAL_INDEPENDENT_REVIEW_SIGNATURE_AND_TRUSTED_KEY')
+    if packet.get('scientific_novelty_verified') is not True:
+        missing.append('INDEPENDENT_MECHANISTIC_NOVELTY_VS_EXHAUSTED_FAMILIES')
+    # Exchange historical event time does not prove information was received
+    # early enough at the actual intended decision timestamp.
+    if live.get('liquidation_event_payload_validated') is not True or live.get('new_probe_events_received',0)<=0:
+        missing.append('TARGET_COINM_LIVE_FORCEORDER_RECEIPT_AND_GAP_PROVENANCE')
+    if quotes.get('quotes_are_proven_received_at_decision_time') is not True:
+        missing.append('REALTIME_BOOK_AND_LIQUIDATION_INFORMATION_CHRONOLOGY')
+    if (prices.get('reference_regular_fee_schedule',{}).get('account_fee_tier_verified') is not True
+            or quotes.get('broker_fills_verified') is not True):
+        missing.append('VENUE_ACCOUNT_COSTS_AND_EXECUTABLE_FILL_SEMANTICS')
+    if packet.get('independently_attested_future_preregistration') is not True:
+        missing.append('INDEPENDENTLY_ATTESTED_FUTURE_PREREGISTRATION')
+    if packet.get('reviewed_bounded_development_budget') is not True:
+        missing.append('INDEPENDENTLY_REVIEWED_BOUNDED_DEVELOPMENT_BUDGET')
+    if packet.get('approved_information_timing_controls') is not True:
+        missing.append('FALSIFIABLE_INFORMATION_TIMING_AND_CONTROL_DESIGN_REVIEW')
+    # A machine-readable checklist is evidence assessment, not permission.
+    return result('PREEXPERIMENT_SCIENCE_BLOCKED' if missing else
+                  'PREEXPERIMENT_EVIDENCE_COMPLETE_REQUIRES_SEPARATE_PERMISSION',missing)
+
+
+def review_stage03_pending_initial():
+    """Verify packet digests then report blockers; no authority to start search."""
+    import runpy
+    folder=S/'stage03_liquidation_source_access_v1'
+    packet_path=folder/'initial_method_review_handoff_v1.json'
+    try:
+        if packet_path.is_symlink() or not packet_path.is_file() or packet_path.stat().st_size>32768:
+            raise ValueError('INVALID_PACKET_PATH')
+        packet=json.loads(packet_path.read_bytes())
+        if not isinstance(packet,dict):
+            raise ValueError('INVALID_PACKET')
+        refs=packet.get('verified_source_files')
+        required={'protocol','review','regimes','temporal','costs','live','other_market','historical_quotes'}
+        if not isinstance(refs,dict) or set(refs)!=required:
+            raise ValueError('INVALID_MANIFEST')
+        docs={}
+        for key in required:
+            ref=refs[key]
+            if not isinstance(ref,dict) or set(ref)!= {'relative_file','sha256'}:
+                raise ValueError('INVALID_SOURCE_REFERENCE')
+            name=ref['relative_file']
+            if not isinstance(name,str):
+                raise ValueError('INVALID_SOURCE_PATH')
+            parts=Path(name).parts
+            if not parts or parts[0]!='stage03_liquidation_source_access_v1' or '..' in parts:
+                raise ValueError('INVALID_SOURCE_PATH')
+            path=S.joinpath(*parts)
+            if path.is_symlink() or not path.is_file() or path.stat().st_size>50000:
+                raise ValueError('INVALID_SOURCE_FILE')
+            blob=path.read_bytes()
+            expected=ref['sha256']
+            if not isinstance(expected,str) or len(expected)!=64 or hashlib.sha256(blob).hexdigest()!=expected:
+                raise ValueError('HASH_MISMATCH')
+            docs[key]=json.loads(blob)
+        ns=runpy.run_path(str(Path(__file__).with_name('v57_prospective_causal_protocol_v1.py')))
+        reviewer=ns['verify_signed_initial_review'](
+            packet_path,folder/'external_initial_review_v1.json',
+            folder/'external_initial_review_v1.sig',
+            Path('/etc/tradingai/omega-scientific-review-pubkey.pem'))
+        return stage03_preexperiment_readiness(packet,docs,reviewer['status'])
+    except (OSError,ValueError,TypeError,KeyError,UnicodeError,AttributeError):
+        return stage03_preexperiment_readiness(None,None,'DENY_EVIDENCE_NOT_INDEPENDENTLY_VERIFIED')
+
+
+if __name__=='__main__':
+    try:main()
+    except Exception as e:
+        print('STOP|FAIL|INDEPENDENT_EVIDENCE_VERIFIER_V2|'+str(e))
+        sys.exit(3)
