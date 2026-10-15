@@ -244,3 +244,64 @@ def test_historical_coinm_archive_status_checks_both_bytes_not_new_admission(tmp
     (tmp_path / 'report.json').unlink()
     (tmp_path / 'report.json').symlink_to(tmp_path / 'report-elsewhere')
     assert gate() is None
+
+
+def test_stage03_historical_regime_coverage_tracks_checksums_but_denies_admission(tmp_path):
+    """Trusted live research does not follow from historical archive metadata."""
+    import hashlib
+    ns=runpy.run_path(str(A/'v57_hypothesis_feasibility_triage_v1.py'))
+    check=ns['historical_regime_coverage']
+    report=tmp_path/'source.json'
+    timing=tmp_path/'temporal.json'
+    check.__globals__['HISTORICAL_REGIME']=report
+    check.__globals__['HISTORICAL_TEMPORAL']=timing
+    assert check() is None
+    rows=[]
+    for day,unique in [('2024-03-05',672),('2024-04-13',423),
+                       ('2024-08-05',952),('2024-08-06',179)]:
+        name=f'BTCUSD_PERP-liquidationSnapshot-{day}.zip'
+        raw=day.encode()
+        (tmp_path/name).write_bytes(raw)
+        rows.append(dict(day=day,kind='liquidationSnapshot',zip_file=name,
+                         zip_sha256=hashlib.sha256(raw).hexdigest(),
+                         provider_checksum_verified=True,historical_only=True,
+                         unique_timestamps=unique,exact_duplicate_rows=unique))
+    name='BTCUSD_PERP-bookDepth-2024-08-05.zip'
+    (tmp_path/name).write_bytes(b'book')
+    rows.append(dict(day='2024-08-05',kind='bookDepth',zip_file=name,
+                     zip_sha256=hashlib.sha256(b'book').hexdigest(),
+                     provider_checksum_verified=True,historical_only=True))
+    safe=dict(prospective_data_admitted=False,scientific_hypothesis_admitted=False,
+              research_execution_authorized=False,search_executed=False,
+              backtest_executed=False,orders_allowed=False,mt5_allowed=False,
+              holdout_allowed=False,auto_promotion_allowed=False)
+    doc=dict(kind='OMEGA_STAGE03_BTCUSD_PERP_HISTORICAL_EVENT_REGIME_AUDIT_V1',
+             status='OFFICIAL_ARCHIVE_CHECKSUM_PASS_EVENT_SAMPLE_ACROSS_REGIMES_NOT_EXPERIMENT',
+             instrument='BINANCE_COINM_BTCUSD_PERP',records=rows,**safe)
+    raw=json.dumps(doc).encode()
+    report.write_bytes(raw)
+    clocks=dict(kind='OMEGA_STAGE03_COINM_HISTORICAL_TEMPORAL_COVERAGE_AUDIT_V1',
+                source_audit_sha256=hashlib.sha256(raw).hexdigest(),
+                book_depth_exactly_thirty_seconds_spacing=True,
+                book_depth_ticks=2880,book_depth_bucket_count=10,
+                august_5_unique_liquidation_snapshot_times=952,
+                august_5_events_with_prior_thirty_second_book_depth_grid=952,
+                future_prospective_data_verified=False,
+                hypothesis_admitted=False,independent_scientific_review=False,
+                research_execution_authorized=False,backtest_executed=False,
+                search_executed=False,orders_allowed=False,mt5_allowed=False,
+                holdout_allowed=False,auto_promotion_allowed=False)
+    timing.write_text(json.dumps(clocks))
+    assert check()[2]==2226
+    (tmp_path/'BTCUSD_PERP-bookDepth-2024-08-05.zip').write_bytes(b'tamper')
+    assert check() is None
+    (tmp_path/'BTCUSD_PERP-bookDepth-2024-08-05.zip').write_bytes(b'book')
+    clocks['research_execution_authorized']=True
+    timing.write_text(json.dumps(clocks))
+    assert check() is None
+    clocks['research_execution_authorized']=False
+    timing.write_text(json.dumps(clocks))
+    rows[0]['unique_timestamps']=671
+    doc['records']=rows
+    report.write_text(json.dumps(doc))
+    assert check() is None

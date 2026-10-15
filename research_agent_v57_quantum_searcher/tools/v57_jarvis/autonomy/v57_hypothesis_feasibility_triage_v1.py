@@ -11,6 +11,59 @@ PREEXPERIMENT=S/'stage03_liquidation_source_access_v1/first_experiment_protocol_
 PREEXPERIMENT_REVIEW=S/'stage03_liquidation_source_access_v1/prospective_causal_protocol_review_v1.json'
 GLOBAL_FORCEORDER=S/'stage03_liquidation_source_access_v1/global_forceorder_market_type_triage_v1.json'
 HISTORICAL=S/'stage03_liquidation_source_access_v1/historical_binance_vision_exploratory/verified_archive_integrity_v1.json'
+HISTORICAL_REGIME=HISTORICAL.with_name('historical_regime_source_audit_v1.json')
+HISTORICAL_TEMPORAL=HISTORICAL.with_name('temporal_coverage_audit_v1.json')
+
+
+def historical_regime_coverage():
+    """Verify byte-bound historical source coverage, never authorize experiment."""
+    try:
+        if any(not p.is_file() or p.is_symlink() or p.stat().st_size>50000
+               for p in (HISTORICAL_REGIME,HISTORICAL_TEMPORAL)):
+            return None
+        raw=HISTORICAL_REGIME.read_bytes()
+        doc=json.loads(raw)
+        temporal_raw=HISTORICAL_TEMPORAL.read_bytes()
+        clock=json.loads(temporal_raw)
+        rows=doc.get('records')
+        expected_days={'2024-03-05','2024-04-13','2024-08-05','2024-08-06'}
+        if (doc.get('kind')!='OMEGA_STAGE03_BTCUSD_PERP_HISTORICAL_EVENT_REGIME_AUDIT_V1'
+                or doc.get('status')!='OFFICIAL_ARCHIVE_CHECKSUM_PASS_EVENT_SAMPLE_ACROSS_REGIMES_NOT_EXPERIMENT'
+                or doc.get('instrument')!='BINANCE_COINM_BTCUSD_PERP'
+                or not isinstance(rows,list) or len(rows)!=5
+                or any(doc.get(k) is not False for k in ('prospective_data_admitted',
+                        'scientific_hypothesis_admitted','research_execution_authorized','search_executed',
+                        'backtest_executed','orders_allowed','mt5_allowed','holdout_allowed','auto_promotion_allowed'))
+                or clock.get('source_audit_sha256')!=hashlib.sha256(raw).hexdigest()
+                or clock.get('kind')!='OMEGA_STAGE03_COINM_HISTORICAL_TEMPORAL_COVERAGE_AUDIT_V1'
+                or clock.get('book_depth_exactly_thirty_seconds_spacing') is not True
+                or clock.get('book_depth_ticks')!=2880 or clock.get('book_depth_bucket_count')!=10
+                or clock.get('august_5_unique_liquidation_snapshot_times')!=952
+                or clock.get('august_5_events_with_prior_thirty_second_book_depth_grid')!=952
+                or any(clock.get(k) is not False for k in ('future_prospective_data_verified',
+                        'hypothesis_admitted','independent_scientific_review','research_execution_authorized',
+                        'backtest_executed','search_executed','orders_allowed','mt5_allowed',
+                        'holdout_allowed','auto_promotion_allowed'))):
+            return None
+        observed_days={r.get('day') for r in rows if r.get('kind')=='liquidationSnapshot'}
+        if observed_days!=expected_days or len([r for r in rows if r.get('kind')=='bookDepth'])!=1:
+            return None
+        for r in rows:
+            name=r.get('zip_file')
+            if not isinstance(name,str) or name.startswith('.') or '/' in name or '\\' in name:
+                return None
+            path=HISTORICAL_REGIME.parent/name
+            if (not path.is_file() or path.is_symlink() or path.stat().st_size>600000
+                    or hashlib.sha256(path.read_bytes()).hexdigest()!=r.get('zip_sha256')
+                    or r.get('provider_checksum_verified') is not True
+                    or r.get('historical_only') is not True):
+                return None
+        n=sum(r['unique_timestamps'] for r in rows if r['kind']=='liquidationSnapshot')
+        if n!=2226 or sum(r['exact_duplicate_rows'] for r in rows if r['kind']=='liquidationSnapshot')!=n:
+            return None
+        return (hashlib.sha256(raw).hexdigest(),hashlib.sha256(temporal_raw).hexdigest(),n)
+    except (OSError,TypeError,ValueError,KeyError,AttributeError):
+        return None
 
 
 def historical_coinm_archive_integrity_sha256():
@@ -132,6 +185,7 @@ def main():
     preexperiment_sha256=first_experiment_review_status()
     non_target_sample_sha256=non_target_liquidation_sample_sha256()
     historical_archive_sha256=historical_coinm_archive_integrity_sha256()
+    regime=historical_regime_coverage()
     rows=[]
     for p in proposals['proposals']:
         assert p['market']=='BTCUSD' and p['execution_authorized'] is False
@@ -146,7 +200,7 @@ def main():
         else:
             classification='UNSPECIFIED_MECHANISM_REQUIRES_REVIEW'
         rows.append({'hypothesis_id':p['hypothesis_id'],'source_doi':p['source_doi'],'classification':classification,'status':'NOT_ADMITTED','novelty_verified':False,'execution_authorized':False})
-    result={'kind':'V57_HYPOTHESIS_FEASIBILITY_TRIAGE_V1','status':'PASS_REVIEW_ONLY','reviewed':len(rows),'data_sha256':data['sha256'],'public_futures_book_source_review_sha256':public_source_sha256,'first_experiment_review_only_sha256':preexperiment_sha256,'first_experiment_status':('FORMULATED_FOR_EXTERNAL_PREEXPERIMENT_REVIEW_NOT_AUTHORIZED' if preexperiment_sha256 else 'PREEXPERIMENT_REVIEW_NOT_ESTABLISHED'),'independent_replication_required_for_first_hypothesis_review':False,'independent_replication_required_for_final_admission':True,'non_target_global_liquidation_sample_sha256':non_target_sample_sha256,'non_target_global_liquidation_status':('THREE_USDM_ST1_MESSAGES_OBSERVED_NOT_COINM_BTCUSD_PERP' if non_target_sample_sha256 else 'NO_VALID_NON_TARGET_WS_SAMPLE'),'target_historical_archive_integrity_sha256':historical_archive_sha256,'target_historical_unique_timestamps_checked':(24 if historical_archive_sha256 else 0),'target_historical_archive_role':'EXPLORATORY_SOURCE_INTEGRITY_ONLY_NOT_PROSPECTIVE','target_instrument_forceorder_messages_verified':False,'liquidation_observations_verified':False,'independent_replication_verified':False,'items':rows,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
+    result={'kind':'V57_HYPOTHESIS_FEASIBILITY_TRIAGE_V1','status':'PASS_REVIEW_ONLY','reviewed':len(rows),'data_sha256':data['sha256'],'public_futures_book_source_review_sha256':public_source_sha256,'first_experiment_review_only_sha256':preexperiment_sha256,'first_experiment_status':('FORMULATED_FOR_EXTERNAL_PREEXPERIMENT_REVIEW_NOT_AUTHORIZED' if preexperiment_sha256 else 'PREEXPERIMENT_REVIEW_NOT_ESTABLISHED'),'independent_replication_required_for_first_hypothesis_review':False,'independent_replication_required_for_final_admission':True,'non_target_global_liquidation_sample_sha256':non_target_sample_sha256,'non_target_global_liquidation_status':('THREE_USDM_ST1_MESSAGES_OBSERVED_NOT_COINM_BTCUSD_PERP' if non_target_sample_sha256 else 'NO_VALID_NON_TARGET_WS_SAMPLE'),'target_historical_archive_integrity_sha256':historical_archive_sha256,'target_historical_unique_timestamps_checked':(24 if historical_archive_sha256 else 0),'target_historical_archive_role':'EXPLORATORY_SOURCE_INTEGRITY_ONLY_NOT_PROSPECTIVE','target_historical_regime_source_sha256':(regime[0] if regime else None),'target_historical_temporal_coverage_sha256':(regime[1] if regime else None),'target_historical_four_sampled_days_distinct_snapshot_times':(regime[2] if regime else 0),'target_historical_bookdepth_bucket_seconds':(30 if regime else None),'target_historical_sampled_prospective_or_replicated':False,'target_instrument_forceorder_messages_verified':False,'liquidation_observations_verified':False,'independent_replication_verified':False,'items':rows,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
     tmp=O.with_suffix('.tmp')
     tmp.write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
     tmp.replace(O)
