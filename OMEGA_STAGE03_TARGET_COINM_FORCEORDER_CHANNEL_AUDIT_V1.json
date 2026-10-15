@@ -1,0 +1,39 @@
+{
+  "auto_promotion_allowed": false,
+  "backtest_executed": false,
+  "bounded_probe_seconds": 45,
+  "connected": true,
+  "created_at_utc": "2026-10-15T22:36:47.060937+00:00",
+  "depth_10_valid_messages": 80,
+  "depth_sample_integrity_verified": true,
+  "evidence_sha256": "9c672c09352739c8484cfcc99eb6fa90701b6aca9eb2cc262ba4bc8829c455ae",
+  "full_receipt_gap_provenance_verified": false,
+  "holdout_allowed": false,
+  "independent_reviewer_present": false,
+  "interpretation": "No target forceOrder was emitted in this 45-second window; this does not prove the absence of liquidations or independently validate the stream.",
+  "kind": "OMEGA_STAGE03_TARGET_LIQUIDATION_CHANNEL_BOUNDED_DIAGNOSTIC_V1",
+  "local_data_research_admissible": false,
+  "max_valid_depth_receipt_gap_ms": 1367,
+  "mt5_allowed": false,
+  "next_requirements": [
+    "INDEPENDENT_SCIENTIFIC_REVIEW_AUTHORITY",
+    "INDEPENDENT_RECEIPT_TIME_ATTESTATION",
+    "REAL_COINM_BTCUSD_PERP_FORCEORDER_EVENT_ON_PUBLIC_TARGET_FEED",
+    "FUTURE_ONLY_PREREGISTERED_DATA_CUSTODY"
+  ],
+  "orders_allowed": false,
+  "other_forceorder_observed": 0,
+  "research_execution_authorized": false,
+  "schema_version": 1,
+  "search_executed": false,
+  "source": "PUBLIC_BINANCE_COINM_BTCUSD_PERP_SYMBOL_SPECIFIC_STREAM",
+  "target_forceorder_observed": 0,
+  "target_forceorder_stream_actively_usable_verified": false,
+  "unchanged_gate_status": "DENIED",
+  "valid_depth_sample_hashes": [
+    "933c9c45d6a048ee0b58a20170190868fc25f6e4b2afdd774b504d76116243cd",
+    "49cfdfd0e81f5ff9a6e00f6c8b42971e03f33966bd739c38a486b10715f52ce3",
+    "3c24888aea5dbd5bf6de829e65bf44235803509fac70e29f8378dee9a5f34c8a",
+    "a95d733597a0dafafa8e1812853f6771cf407016931ad7239f4abcc9fd97b98d"
+  ]
+}
