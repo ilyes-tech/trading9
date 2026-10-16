@@ -4,6 +4,43 @@
   "decision": "DATA_ALIGNMENT_FEASIBLE_ONLY;REQUIRE_SOURCE_CUSTODY_AND_SCIENTIFIC_REVIEW_BEFORE_EXPERIMENT",
   "holdout_accessed": false,
   "kind": "OMEGA_STAGE03_BTC_ETH_TRAIN_ONLY_TIMING_PREFLIGHT_V1",
+  "manifest_serialization_reconciliation": {
+    "evidence": "Original downloader exports UTC datetime with +00:00; current CSV and repair exports use Z. The size differences equal exactly five bytes per declared row. The repair export independently records current sizes and row counts.",
+    "limitations": [
+      "Verified provenance of CSV size change, not independently authenticated venue custody for all market rows",
+      "No full historical or reserved-validation region contents were read for this reconciliation",
+      "The original manifest must remain unchanged; final untouched holdout remains inaccessible"
+    ],
+    "markets": {
+      "BTCUSD": {
+        "current_size": 13238560,
+        "declared_rows": 132113,
+        "delta_bytes": 660565,
+        "expected_delta_from_timezone_rendering": 660565,
+        "original_manifest_size": 13899125,
+        "original_writer_datetime_format": "ISO+00:00",
+        "per_row_time_serialization_bytes_saved": 5,
+        "post_repair_recorded_size": 13238560,
+        "sampled_first_train_row_timestamp_format": "Z"
+      },
+      "ETHUSD": {
+        "current_size": 12580351,
+        "declared_rows": 132116,
+        "delta_bytes": 660580,
+        "expected_delta_from_timezone_rendering": 660580,
+        "original_manifest_size": 13240931,
+        "original_writer_datetime_format": "ISO+00:00",
+        "per_row_time_serialization_bytes_saved": 5,
+        "post_repair_recorded_size": 12580351,
+        "sampled_first_train_row_timestamp_format": "Z"
+      }
+    },
+    "original_exporter_source_path": "tools/download_coinbase_q4_m1.py",
+    "original_exporter_source_sha256": "c763b79e6a38fddb8010e1c09196b71ba9c9e0a470daa91c02935a27bdd320ce",
+    "original_manifest_sha256": "4a60166029a4a6c54a402e19eae8f58dbef43c94cf7b62496bb35762a8bdcad0",
+    "postrepair_log_sha256": "0cccb5b5db685dce3adfe5935dd10a18ce88571437f80fe655a486c21f210139",
+    "status": "RECONCILED_AS_REEXPORT_TIMESTAMP_FORMAT_CHANGE_NO_RAW_DATA_MODIFIED"
+  },
   "mt5_allowed": false,
   "new_backtest_executed": false,
   "new_family_admitted": false,
@@ -19,7 +56,7 @@
   "search_execution_authorized": false,
   "source_provenance_limitations": [
     "Full source custody not independently attested",
-    "Historic CSV original manifest size mismatches actual serialized files by exactly five bytes per declared row",
+    "Historic CSV size difference reconciled to UTC ISO timestamp re-export +00:00 versus Z, with post-repair size record",
     "Coinbase public sample matches are only partial checks",
     "Published BTC ETH transmission is mostly contemporaneous in a 2026 reference; predictive lag not established"
   ],
