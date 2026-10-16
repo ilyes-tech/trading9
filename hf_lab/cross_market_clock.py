@@ -50,6 +50,11 @@ def aligned_four_minute_pairs(
     For anchor t: BTC signal closes at t+60s, decision at t+60s,
     proxy ETH entry at t+120s, proxy ETH exit at t+180s.
     Only returns indices; never reads bar prices or scores outcomes.
+
+    IMPORTANT: availability of the t+120 label bar is future information.
+    Therefore this function is ONLY an offline label-coverage alignment;
+    using the presence/absence of a returned window as a live entry filter
+    would be lookahead leakage. Never reuse it to authorize a real signal.
     """
     btc = _minute_indices(btc_bars)
     eth = _minute_indices(eth_bars)
