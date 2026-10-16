@@ -660,6 +660,12 @@ def test_second_independent_scientific_assessment_intake_cannot_authorize(tmp_pa
     provenance.write_text(json.dumps(provenance_data))
     assert verify(index, provenance, review, sig, public)['status'] == 'DENY_SCIENTIFIC_SOURCE_SCHEMA'
     provenance.write_text(json.dumps(orig, sort_keys=True))
+    for unsafe in ('mt5_allowed', 'auto_promotion_allowed', 'development_experiment_authorized',
+                   'backtest_executed', 'search_executed', 'candidate_admitted'):
+        mutated = dict(orig, **{unsafe: True})
+        provenance.write_text(json.dumps(mutated, sort_keys=True))
+        assert verify(index, provenance, review, sig, public)['status'] == 'DENY_SCIENTIFIC_SOURCE_SCHEMA'
+    provenance.write_text(json.dumps(orig, sort_keys=True))
     duplicate = json.loads(provenance.read_text())
     duplicate['sources']['receipt_clock_attestation'] = duplicate['sources']['target_liquidation_receipts']
     provenance.write_text(json.dumps(duplicate))
@@ -668,3 +674,26 @@ def test_second_independent_scientific_assessment_intake_cannot_authorize(tmp_pa
     public.chmod(0o666)
     assert verify(index, provenance, review, sig, public)['status'] == (
         'DENY_SEPARATE_SCIENTIFIC_REVIEW_AUTHORITY_NOT_PROVISIONED')
+
+
+def test_second_scientific_assessment_requires_first_independently_verified_review():
+    """Second integrity check must not run before first signature authority."""
+    ns=runpy.run_path(str(A/'v57_independent_evidence_verifier_v2.py'))
+    gate=ns['stage03_science_after_initial_review']
+    touched=[]
+    def second():
+        touched.append(True)
+        return dict(status='SIGNED_SCIENTIFIC_ASSESSMENT_ONLY_NOT_AUTHORIZED',
+                    scientific_admission=False,orders_allowed=False)
+    for initial in (None, {}, {'external_review_status':'DENY_INDEPENDENT_REVIEW_AUTHORITY_NOT_PROVISIONED'},
+                    {'external_review_status':'SIGNED_INITIAL_REVIEW_REJECT_REDUNDANT_MECHANISM_NOT_AUTHORIZED'},
+                    {'external_review_status':'SIGNED_INITIAL_REVIEW_REQUEST_FIXED_DEFINITION_NOT_AUTHORIZED'}):
+        verdict=gate(initial,second)
+        assert verdict['status']=='DENY_INITIAL_METHOD_REVIEW_NOT_VERIFIED'
+        assert all(verdict[key] is False for key in ('scientific_admission',
+            'research_execution_authorized','development_experiment_authorized',
+            'orders_allowed','mt5_allowed','holdout_allowed','auto_promotion_allowed'))
+    assert touched==[]
+    passed=gate({'external_review_status':'INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED'},second)
+    assert touched==[True]
+    assert passed['scientific_admission'] is False and passed['orders_allowed'] is False

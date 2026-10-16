@@ -316,14 +316,20 @@ def verify_signed_scientific_assessment(index_path, provenance_path,
                 or index.get('kind') != 'OMEGA_STAGE03_INDEPENDENT_REVIEW_HANDOFF_INDEX_V1'
                 or index.get('independent_reviewer_signed') is not False
                 or index.get('scientific_admission') is not False
+                or any(index.get(flag, False) is not False for flag in (
+                    'research_execution_authorized', 'orders_allowed', 'holdout_allowed',
+                    'mt5_allowed', 'auto_promotion_allowed', 'development_experiment_authorized',
+                    'market_backtest_started', 'search_started'))
                 or not isinstance(provenance, dict)
                 or provenance.get('kind') != 'OMEGA_STAGE03_PROSPECTIVE_SOURCE_PROVENANCE_V1'
                 or provenance.get('instrument') != 'BINANCE_COINM_BTCUSD_PERP'
                 or provenance.get('initial_packet_sha256') != index.get('review_packet_sha256')
                 or provenance.get('review_index_sha256') != hashlib.sha256(index_bytes).hexdigest()
-                or provenance.get('research_execution_authorized') is not False
-                or provenance.get('orders_allowed') is not False
-                or provenance.get('holdout_allowed') is not False):
+                or any(provenance.get(flag) is not False for flag in (
+                    'research_execution_authorized', 'orders_allowed', 'holdout_allowed'))
+                or any(provenance.get(flag, False) is not False for flag in (
+                    'mt5_allowed', 'auto_promotion_allowed', 'development_experiment_authorized',
+                    'backtest_executed', 'search_executed', 'candidate_admitted'))):
             return result('DENY_SCIENTIFIC_SOURCE_SCHEMA')
         sources = provenance.get('sources')
         expected = {'target_liquidation_receipts','receipt_clock_attestation',

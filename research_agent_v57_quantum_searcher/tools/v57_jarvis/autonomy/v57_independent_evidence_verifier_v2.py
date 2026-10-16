@@ -356,14 +356,32 @@ def main():
  import runpy
  assessor=runpy.run_path(str(Path(__file__).with_name('v57_prospective_causal_protocol_v1.py')))['verify_signed_scientific_assessment']
  folder=S/'stage03_liquidation_source_access_v1'
- doc['stage03_independent_scientific_assessment']=assessor(
-     Path(__file__).resolve().parents[4] / 'OMEGA_STAGE03_INDEPENDENT_REVIEW_HANDOFF_INDEX_V1.json',
-     folder/'external_prospective_source_provenance_v1.json',
-     folder/'external_scientific_assessment_v1.json',
-     folder/'external_scientific_assessment_v1.sig',
-     Path('/etc/tradingai/omega-stage03-science-pubkey.pem'))
+ doc['stage03_independent_scientific_assessment']=stage03_science_after_initial_review(
+     doc['stage03_initial_readiness'], lambda: assessor(
+         Path(__file__).resolve().parents[4] / 'OMEGA_STAGE03_INDEPENDENT_REVIEW_HANDOFF_INDEX_V1.json',
+         folder/'external_prospective_source_provenance_v1.json',
+         folder/'external_scientific_assessment_v1.json',
+         folder/'external_scientific_assessment_v1.sig',
+         Path('/etc/tradingai/omega-stage03-science-pubkey.pem')))
  q=S/"independent_evidence_verifier_v2.tmp";q.write_text(json.dumps(doc,sort_keys=True,indent=2)+"\n");q.replace(S/"independent_evidence_verifier_v2.json")
  print("ALL PASS|INDEPENDENT_EVIDENCE_VERIFIER_V2|TESTS=4|ALLOWLIST=1|NOVELTY=NO")
+def stage03_science_after_initial_review(initial, assessor):
+    """Reject the second intake unless the first independent signature verified.
+
+    The initial result comes only from review_stage03_pending_initial(), which
+    verifies exact bytes, evidence hashes and a separately provisioned trust key.
+    This dependency gate never grants scientific admission or execution.
+    """
+    if (not isinstance(initial, dict) or
+            initial.get('external_review_status') != 'INITIAL_REVIEW_SIGNATURE_VERIFIED_NOT_AUTHORIZED'):
+        return dict(kind='OMEGA_STAGE03_SIGNED_SCIENTIFIC_ASSESSMENT_INTAKE_V1',
+                    status='DENY_INITIAL_METHOD_REVIEW_NOT_VERIFIED',
+                    scientific_admission=False, research_execution_authorized=False,
+                    development_experiment_authorized=False, orders_allowed=False,
+                    mt5_allowed=False, holdout_allowed=False, auto_promotion_allowed=False)
+    return assessor()
+
+
 def stage03_preexperiment_readiness(packet, sources, external_review_status):
     """Explain the next real science gap. This assessment NEVER authorizes execution.
 
