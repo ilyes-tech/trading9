@@ -1,0 +1,144 @@
+{
+  "auto_promotion_allowed": false,
+  "decision": "DO_NOT_REPEAT_SIX_EXHAUSTED_STRATEGIES_PER_MARKET_AS_NEW_STAGE03_CANDIDATES",
+  "holdout_accessed": false,
+  "kind": "OMEGA_STAGE03_HISTORICAL_TRAIN_ONLY_CANDIDATE_TRIAGE_V1",
+  "manifest_sha256": "4a60166029a4a6c54a402e19eae8f58dbef43c94cf7b62496bb35762a8bdcad0",
+  "mt5_allowed": false,
+  "new_candidate_admitted": false,
+  "new_experiment_executed": false,
+  "orders_allowed": false,
+  "prior_candidate_count": 12,
+  "prior_candidates_with_net_positive": 0,
+  "prior_candidates_with_pf_at_least_1": 0,
+  "prior_train_results_sha256": "cec8a3bd8cf46787ae0e9b143c2f237350769bde0e7232184eec784392d6d87c",
+  "public_provider_sample_crosscheck": {
+    "first_five_rows_per_symbol": {
+      "BTCUSD": "5/5 MATCH",
+      "ETHUSD": "5/5 MATCH"
+    },
+    "provider": "Coinbase Exchange public candles REST API, sampled training timestamps only",
+    "provider_samples_are_not_complete_dataset_provenance": true,
+    "purpose": "Cross-check exchange OHLC at selected training-only timestamps, not provider custody attestation",
+    "total_match": "16/16",
+    "train_quartile_matches": "6/6 MATCH",
+    "train_quartile_timestamps_utc": {
+      "BTCUSD": [
+        1760465760,
+        1761676680,
+        1762865640
+      ],
+      "ETHUSD": [
+        1760465820,
+        1761676560,
+        1762865580
+      ]
+    }
+  },
+  "research_execution_authorized": false,
+  "schema_version": 1,
+  "scientific_limitations": [
+    "The 2025 Coinbase files are existing historical development data and the 12 results already informed strategy selection.",
+    "Manifest sizes disagree with actual CSV sizes by exactly 5 bytes per declared row. Cause not independently proven; do not overwrite original manifest.",
+    "Public provider sample checks corroborate 16 training OHLC observations, not custody or the complete dataset.",
+    "Past records cannot retroactively count as a new preregistered independent experiment."
+  ],
+  "scope": "METADATA_AND_PREVIOUS_TRAIN_ONLY_RESULTS;NO_VALIDATION_OR_HOLDOUT_OPENED",
+  "search_execution_authorized": false,
+  "stage03_completed": false,
+  "status": "PRIOR_TRAIN_ONLY_CANDIDATES_NEGATIVE_NO_NEW_SCIENTIFIC_EXPERIMENT",
+  "training_data": [
+    {
+      "actual_csv_rows_excluding_header_not_independently_recounted": true,
+      "actual_file_size_bytes": 13238560,
+      "data_period": "2025-Q4",
+      "difference_exactly_five_bytes_per_manifest_row": true,
+      "original_manifest_size_bytes": 13899125,
+      "previously_tested_strategies": [
+        {
+          "prior_train_only_net_r": -6638.037081926061,
+          "prior_train_only_pf": 0.015248331045489397,
+          "strategy": "MOMENTUM_BURST"
+        },
+        {
+          "prior_train_only_net_r": -16260.56235493716,
+          "prior_train_only_pf": 0.0052582143451576305,
+          "strategy": "RANGE_BREAKOUT"
+        },
+        {
+          "prior_train_only_net_r": -7551.183723001692,
+          "prior_train_only_pf": 0.0017552525573466308,
+          "strategy": "RANGE_EDGE_REVERSAL"
+        },
+        {
+          "prior_train_only_net_r": -1242.6122513615787,
+          "prior_train_only_pf": 0.0011701981013106013,
+          "strategy": "SHOCK_REVERSAL"
+        },
+        {
+          "prior_train_only_net_r": -2198.7977161607128,
+          "prior_train_only_pf": 0.015452450817610132,
+          "strategy": "TREND_PULLBACK"
+        },
+        {
+          "prior_train_only_net_r": -23234.67440529334,
+          "prior_train_only_pf": 0.0022073081271263536,
+          "strategy": "ZSCORE_MEAN_REVERSION"
+        }
+      ],
+      "symbol": "BTCUSD",
+      "time_gap_boundaries_seen_on_train": 9,
+      "train_end": "2025-11-25T07:11:00+00:00",
+      "train_prefix_sha256_including_csv_header": "691f294778a2be99b9ae24b2a4ecbec8f987da5f05164699b56a2f305466f4e7",
+      "train_rows_scanned": 79267,
+      "train_start": "2025-10-01T00:00:00+00:00",
+      "venue": "Coinbase Exchange Spot"
+    },
+    {
+      "actual_csv_rows_excluding_header_not_independently_recounted": true,
+      "actual_file_size_bytes": 12580351,
+      "data_period": "2025-Q4",
+      "difference_exactly_five_bytes_per_manifest_row": true,
+      "original_manifest_size_bytes": 13240931,
+      "previously_tested_strategies": [
+        {
+          "prior_train_only_net_r": -8074.049709487851,
+          "prior_train_only_pf": 0.05933551447147325,
+          "strategy": "MOMENTUM_BURST"
+        },
+        {
+          "prior_train_only_net_r": -9009.46352485833,
+          "prior_train_only_pf": 0.039401714754690814,
+          "strategy": "RANGE_BREAKOUT"
+        },
+        {
+          "prior_train_only_net_r": -4468.224450590016,
+          "prior_train_only_pf": 0.012542204055595155,
+          "strategy": "RANGE_EDGE_REVERSAL"
+        },
+        {
+          "prior_train_only_net_r": -708.7753646246709,
+          "prior_train_only_pf": 0.019007047422756693,
+          "strategy": "SHOCK_REVERSAL"
+        },
+        {
+          "prior_train_only_net_r": -2352.5608010760884,
+          "prior_train_only_pf": 0.0585330993218427,
+          "strategy": "TREND_PULLBACK"
+        },
+        {
+          "prior_train_only_net_r": -13630.134873442792,
+          "prior_train_only_pf": 0.0179641609391487,
+          "strategy": "ZSCORE_MEAN_REVERSION"
+        }
+      ],
+      "symbol": "ETHUSD",
+      "time_gap_boundaries_seen_on_train": 8,
+      "train_end": "2025-11-25T07:10:00+00:00",
+      "train_prefix_sha256_including_csv_header": "a45a6eedfcba9430b4789b2f9f14b71ee52e3d1ca72e161b9494c6c692d2943b",
+      "train_rows_scanned": 79269,
+      "train_start": "2025-10-01T00:00:00+00:00",
+      "venue": "Coinbase Exchange Spot"
+    }
+  ]
+}
