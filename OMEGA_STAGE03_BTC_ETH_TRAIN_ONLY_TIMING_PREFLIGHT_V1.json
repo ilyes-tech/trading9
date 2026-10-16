@@ -1,0 +1,49 @@
+{
+  "auto_promotion_allowed": false,
+  "causally_ordered_three_consecutive_minute_windows": 79240,
+  "decision": "DATA_ALIGNMENT_FEASIBLE_ONLY;REQUIRE_SOURCE_CUSTODY_AND_SCIENTIFIC_REVIEW_BEFORE_EXPERIMENT",
+  "holdout_accessed": false,
+  "kind": "OMEGA_STAGE03_BTC_ETH_TRAIN_ONLY_TIMING_PREFLIGHT_V1",
+  "mt5_allowed": false,
+  "new_backtest_executed": false,
+  "new_family_admitted": false,
+  "orders_allowed": false,
+  "paired_common_minutes": 79260,
+  "paired_minutes_not_eligible_for_three_consecutive_window": 20,
+  "prior_train_triage_sha256": "5cdf59b76b63ab9597b5dd4b012d3f341613c828e6385e66ca34d9aeee71ad99",
+  "proposal_sha256": "df390e729699aebfebfc3453a498a30a2620cd16d6f71eef5350ce0bfb50c8af",
+  "research_execution_authorized": false,
+  "schema_version": 1,
+  "scientific_novelty_proven": false,
+  "scope": "ONLY_PRIOR_REPORTED_60_PERCENT_TRAIN_PREFIXES;NO_VALIDATION_OR_HOLDOUT",
+  "search_execution_authorized": false,
+  "source_provenance_limitations": [
+    "Full source custody not independently attested",
+    "Historic CSV original manifest size mismatches actual serialized files by exactly five bytes per declared row",
+    "Coinbase public sample matches are only partial checks",
+    "Published BTC ETH transmission is mostly contemporaneous in a 2026 reference; predictive lag not established"
+  ],
+  "status": "TRAIN_ONLY_INPUT_TIMING_PASS_SCIENTIFIC_ADMISSION_STILL_DENIED",
+  "temporal_assumptions_unverified": [
+    "Provider bar timestamp is the start of a full minute",
+    "Decision and next-bar entry are separated by a feasible causal receipt/processing/execution delay",
+    "Actual slippage, spread and fees for the intended venue are not calibrated"
+  ],
+  "training": {
+    "BTCUSD": {
+      "gaps": 9,
+      "train_first_utc": "2025-10-01T00:00:00+00:00",
+      "train_last_utc": "2025-11-25T07:11:00+00:00",
+      "train_prefix_sha256": "691f294778a2be99b9ae24b2a4ecbec8f987da5f05164699b56a2f305466f4e7",
+      "train_rows": 79267
+    },
+    "ETHUSD": {
+      "gaps": 8,
+      "train_first_utc": "2025-10-01T00:00:00+00:00",
+      "train_last_utc": "2025-11-25T07:10:00+00:00",
+      "train_prefix_sha256": "a45a6eedfcba9430b4789b2f9f14b71ee52e3d1ca72e161b9494c6c692d2943b",
+      "train_rows": 79269
+    }
+  },
+  "window_contract": "For a hypothetical three-minute BTC/ETH alignment, all timestamps t-60,t,t+60 must exist for both markets; BTC and ETH predictor bars must be fully closed before subsequent ETH outcome; no gap crossing. This preflight verifies only timestamp geometry, not price prediction."
+}
