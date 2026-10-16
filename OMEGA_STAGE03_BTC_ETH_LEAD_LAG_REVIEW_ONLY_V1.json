@@ -18,7 +18,7 @@
   "kind": "OMEGA_STAGE03_BTC_ETH_PUBLIC_LITERATURE_HYPOTHESIS_REVIEW_ONLY_V1",
   "mechanistic_class": "CROSS_ASSET_LAGGED_PRICE_TRANSMISSION_PUBLISHED_PRIOR_ART",
   "mt5_allowed": false,
-  "next_step": "INDEPENDENT_REVIEW_OF_DISTINCTNESS_AND_SOURCE_BEFORE_SCOPED_DEVELOPMENT_PERMISSION",
+  "next_step": "REQUIRE_SCOPED_INDEPENDENT_METHOD_AND_DATA_REVIEW_BEFORE_ANY_DEVELOPMENT_BACKTEST",
   "orders_allowed": false,
   "prior_art": [
     {
@@ -71,6 +71,72 @@
   },
   "reason_not_executed": "NO_VALID_SCIENTIFIC_EXPERIMENT_AUTHORIZATION_AND_FULL_PROVENANCE_NOT_ESTABLISHED",
   "research_execution_authorized": false,
+  "review_only_fixed_exploratory_development_design": {
+    "assessment_without_tuning": {
+      "baseline_comparison": "Same costs and signal delay for ETH own trailing-minute direction control",
+      "diagnostics": [
+        "Eligible vs skipped windows",
+        "Gross and net return proxy in bps",
+        "Directional hit rate",
+        "Trade count",
+        "Net profit factor",
+        "Max drawdown proxy",
+        "Daily and segment concentration"
+      ],
+      "exit_decision": "REJECT if nonpositive net or insufficient traceability; a PASS only means reproducible exploration, not scientific performance admission.",
+      "max_candidate_rules": 1,
+      "no_final_holdout": true,
+      "no_live_or_demo_orders": true,
+      "no_parameter_search": true,
+      "no_promotion": true
+    },
+    "disclosure": "The dataset and older experiments predate this 2026 hypothesis document; this is post-hoc historical exploratory design, not prior untouched data and not independent scientific replication.",
+    "execution_prerequisites_not_satisfied": [
+      "Review prior local cross-asset experimental lineage for substantive duplication",
+      "Approve exact input custody and timing convention, including decision-to-entry delay and realistic costs",
+      "Independent explicit scoped research permission; current Searcher authorization is DENIED"
+    ],
+    "forbidden_actions_now": [
+      "Fit or backtest real market signal before scoped scientific permission",
+      "Read reserved validation or holdout",
+      "Modify current Searcher gate to force authorization",
+      "Place simulated or real orders"
+    ],
+    "hypothesis": "Prior fully closed BTC minute direction conveys information about ETH one-minute return after a full additional minute delay, beyond a matched own-ETH-lag control.",
+    "one_candidate_only": {
+      "control": "sign(log(ETH_close_t / ETH_close_t_minus_60s))",
+      "decision_time": "t+60s, strictly after BTC and ETH bars starting at t complete",
+      "earliest_proxy_entry": "ETH open of bar starting at t+120s (a full one-minute safety delay)",
+      "gap_policy": "Require t-60s, t, t+60s, t+120s bars on both markets; skip any duplicate/missing/out-of-order time; never synthesize missing candles.",
+      "gross_proxy_return_bps": "10000 * direction * log(ETH_close_t_plus_120s / ETH_open_t_plus_120s)",
+      "limits": "OHLC open/close proxy is not an executable fill or profit guarantee; independent venue execution evidence needed for MT5.",
+      "name": "BTC_TO_ETH_ONE_MINUTE_DELAY_DIRECTION_BASELINE_V1",
+      "net_proxy_return_bps": "gross_proxy_return_bps - 2 * (fee_bps_per_side + slippage_bps_per_side)",
+      "no_lookahead_rule": "BTC and ETH prior bars must be completed at decision; ETH target minute may be read only for later scoring, never for feature computation.",
+      "predictor": "sign(log(BTC_close_t / BTC_close_t_minus_60s))",
+      "proxy_exit": "ETH close of bar starting at t+120s",
+      "zero_return": "ZERO_SIGNAL_NO_TRADE"
+    },
+    "permitted_actions_now": [
+      "Review method and input metadata",
+      "Run unit tests that do not score market signal outcomes"
+    ],
+    "pre_fixed_screening_cost_assumptions": {
+      "fee_bps_per_side": 5.0,
+      "gross_roundtrip_cost_bps": 12.0,
+      "slippage_bps_per_side": 1.0,
+      "source": "Existing historical engineering replay assumptions, not independently calibrated venue fees"
+    },
+    "source_binding": {
+      "dataset": "Coinbase Exchange public spot BTC-USD + ETH-USD, Q4 2025",
+      "eligible_four_consecutive_common_minute_starts": 79231,
+      "input_limit": "ONLY FIRST REPORTED 60 PERCENT TRAIN PREFIXES, BTC 79267 rows, ETH 79269 rows",
+      "local_download_db_and_csv_identical_for_train_rows": 158536,
+      "timing_preflight_sha256": "0a8f125958bb628a145304955f4017eedea61c53c21ee584e7335298c6dd09a7",
+      "validation_holdout_excluded": true
+    },
+    "status": "METHOD_FIXED_FOR_REVIEW_NOT_PREREGISTERED_PROSPECTIVELY_NOT_EXECUTED"
+  },
   "schema_version": 1,
   "search_execution_authorized": false,
   "status": "SOURCE_BACKED_EXPERIMENT_PROPOSAL_NOT_SCIENTIFICALLY_ADMITTED"
