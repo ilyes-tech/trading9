@@ -7,11 +7,11 @@
 - The reviewer's task is to judge novelty and validity, **not** to force approval.
 
 ## Input package already prepared on primary VPS
-- Remote path: /home/trading/.local/state/tradingai/jarvis-autonomous/stage03_liquidation_source_access_v1/stage03_external_review_inputs_bundle_v1.zip
-- ZIP SHA-256: f482c4636d09ebf8c18e09232cf83559a1135f435f34a29fa8100f1f928d5e9d
+- Remote path: /home/trading/.local/state/tradingai/jarvis-autonomous/stage03_liquidation_source_access_v1/stage03_external_review_inputs_bundle_v2.zip
+- ZIP SHA-256: 74c5f4fea7f1fd3dfe0af3b2baff426bfb096cc00e5ad196b6e90e66615c34d2
 - Exact initial packet SHA-256: 83f8ba8a347a897a36a3ed9d241727ce7cc9cfe437074e05a207f0c1e27165fa
 - Exact supplemental index SHA-256: fccad70c61848af26e593e99cc6138009fde67e48d33bbb9ef47d557c4a669af
-- ZIP contains 8 original evidence files, 2 supplemental public probes, source packet, index, README and checksum manifest.
+- ZIP v2 contains 8 original evidence files, 2 supplemental public probes, original packet, index, README, checksum manifest, 4 independently verified RFC3161 request/reply tokens and their audit (19 entries).
 - The original packet covers 8 sources. The index adds 2 probes. Recent public probes contain 98 target COIN-M depth updates and **zero** confirmed BTCUSD_PERP target forceOrder observations. These probes are not prospective, independently attested science.
 
 ## FIRST independent reviewer - method eligibility
@@ -53,3 +53,5 @@
 - Request/response tokens are retained under stage03_liquidation_source_access_v1/protocol_timestamp_evidence_v1/ in the existing JARVIS state directory. Public CA-chain verification and tamper rejection were tested with OpenSSL.
 - Audit: OMEGA_STAGE03_RFC3161_PROPOSAL_ANTERIORITY_AUDIT_V1.json. This is evidence of *file existence at an external time*, not proof of independently approved preregistration, scientific novelty, venue receipt integrity or research authorization.
 - Reviewer must explicitly examine these certificates, timestamps, the fixed prospective design and actual future data custody; no old data may be relabeled as future or as an untouched holdout.
+
+- The original 14-file handoff remains preserved as stage03_external_review_inputs_bundle_v1.zip. The v2 handoff is now the current recommended reviewer attachment; neither bundle contains scientific admission or trading authorization.
