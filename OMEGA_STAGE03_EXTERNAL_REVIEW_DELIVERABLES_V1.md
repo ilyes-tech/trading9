@@ -47,3 +47,9 @@
 - No second trusted assessment authority, signed assessment, or trusted prospective provenance files exist.
 - Do NOT generate self-signed production approvals, fabricate source receipts, shorten the prospective window, read final holdout, activate Searcher, or place any order to unblock this state.
 - Until the external actors complete their work, Stage03 remains FAIL/BLOCKED, regardless of test count or engineering readiness.
+
+## New, separately verifiable October 16, 2026 timestamp evidence (NOT independent scientific approval)
+- DigiCert RFC 3161 independently timestamped the exact unreviewed protocol bytes at 2026-10-16 15:05:46 UTC, and the original unsigned review index at 2026-10-16 15:06:23 UTC.
+- Request/response tokens are retained under stage03_liquidation_source_access_v1/protocol_timestamp_evidence_v1/ in the existing JARVIS state directory. Public CA-chain verification and tamper rejection were tested with OpenSSL.
+- Audit: OMEGA_STAGE03_RFC3161_PROPOSAL_ANTERIORITY_AUDIT_V1.json. This is evidence of *file existence at an external time*, not proof of independently approved preregistration, scientific novelty, venue receipt integrity or research authorization.
+- Reviewer must explicitly examine these certificates, timestamps, the fixed prospective design and actual future data custody; no old data may be relabeled as future or as an untouched holdout.

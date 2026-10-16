@@ -1,0 +1,47 @@
+{
+  "auto_promotion_allowed": false,
+  "development_experiment_authorized": false,
+  "evidentiary_limits": [
+    "Cryptographic evidence that these exact proposal bytes existed by the TSA timestamp, not that scientific claims are correct.",
+    "No independently reviewed definition, researcher custody, source receipt-time integrity or production market event attestation is thereby established.",
+    "Not a reviewer-approved preregistration for a future scientific trial.",
+    "Do not reinterpret past market data as future holdout or authorize search based on this record."
+  ],
+  "first_external_method_review_signed": false,
+  "holdout_allowed": false,
+  "independent_prospective_data_custody_verified": false,
+  "kind": "OMEGA_STAGE03_RFC3161_UNREVIEWED_PROPOSAL_ANTERIORITY_AUDIT_V1",
+  "mt5_allowed": false,
+  "orders_allowed": false,
+  "proofs": {
+    "independent_review_index": {
+      "file_sha256": "fccad70c61848af26e593e99cc6138009fde67e48d33bbb9ef47d557c4a669af",
+      "openssl_ts_verify_against_exact_original_file": "PASS",
+      "openssl_ts_verify_against_os_ca_bundle": "PASS",
+      "request_sha256": "7ccc41465f30bcc0781831b0ac647aa8cb9fe6b75901ad921e3525eeaa9fd76b",
+      "rfc3161_query_state_relpath": "stage03_liquidation_source_access_v1/protocol_timestamp_evidence_v1/review_index.tsq",
+      "rfc3161_reply_state_relpath": "stage03_liquidation_source_access_v1/protocol_timestamp_evidence_v1/review_index.tsr",
+      "rfc3161_response_sha256": "107873c0d2b5fbdd1d0f1e1eb740483906514a390c954d7bae8be44d56588af4",
+      "timestamp_utc": "2026-10-16T15:06:23+00:00"
+    },
+    "unreviewed_prospective_protocol": {
+      "file_sha256": "c00de6d4aa040954471fe99bb102d648133c43bfbd10b1095c665d70218128c3",
+      "openssl_ts_verify_against_exact_original_file": "PASS",
+      "openssl_ts_verify_against_os_ca_bundle": "PASS",
+      "request_sha256": "48b50684ea53aa79221f2da69ca18cdad238e79ce371c9fd7a687566171078b2",
+      "rfc3161_query_state_relpath": "stage03_liquidation_source_access_v1/protocol_timestamp_evidence_v1/protocol.tsq",
+      "rfc3161_reply_state_relpath": "stage03_liquidation_source_access_v1/protocol_timestamp_evidence_v1/protocol.tsr",
+      "rfc3161_response_sha256": "c5f17423d86c39c33717c1fbb6233ee551e059b7a6e2be84882b60a665b54a51",
+      "timestamp_utc": "2026-10-16T15:05:46+00:00"
+    }
+  },
+  "schema_version": 1,
+  "scientific_admission": false,
+  "scientifically_approved_preregistration": false,
+  "scope": "EXTERNAL_TIMESTAMP_OF_BYTES_ONLY",
+  "search_execution_authorized": false,
+  "status": "TWO_EXTERNAL_RFC3161_TIMESTAMPS_VALIDATED_NOT_SCIENTIFIC_PREREGISTRATION",
+  "timestamp_authority": "DigiCert public RFC3161 (certificate chain validated against OS trust store)",
+  "timestamp_server_url": "http://timestamp.digicert.com",
+  "timestamp_service_documentation": "https://knowledge.digicert.com/general-information/rfc3161-compliant-time-stamp-authority-server"
+}
