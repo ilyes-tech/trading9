@@ -353,6 +353,15 @@ def main():
  doc={"schema_version":1,"kind":"V57_INDEPENDENT_EVIDENCE_VERIFIER_V2","status":"PASS","tests":len(cases),"allowlisted_sources":list(ALLOW),"source_sha256":h,"source_schema_checked":True,"trade_robustness_evaluation_supported":True,"trade_cost_arithmetic_supported":True,"temporal_metadata_checks_supported":True,"composed_replay_review_supported":True,"causal_novelty_proven":False,"new_research_authorized":False,"orders_allowed":False,"mt5_allowed":False,"holdout_allowed":False,"auto_promotion_allowed":False}
  doc["replay_review"]=review_pending_replay()
  doc["stage03_initial_readiness"]=review_stage03_pending_initial()
+ import runpy
+ assessor=runpy.run_path(str(Path(__file__).with_name('v57_prospective_causal_protocol_v1.py')))['verify_signed_scientific_assessment']
+ folder=S/'stage03_liquidation_source_access_v1'
+ doc['stage03_independent_scientific_assessment']=assessor(
+     Path(__file__).resolve().parents[4] / 'OMEGA_STAGE03_INDEPENDENT_REVIEW_HANDOFF_INDEX_V1.json',
+     folder/'external_prospective_source_provenance_v1.json',
+     folder/'external_scientific_assessment_v1.json',
+     folder/'external_scientific_assessment_v1.sig',
+     Path('/etc/tradingai/omega-stage03-science-pubkey.pem'))
  q=S/"independent_evidence_verifier_v2.tmp";q.write_text(json.dumps(doc,sort_keys=True,indent=2)+"\n");q.replace(S/"independent_evidence_verifier_v2.json")
  print("ALL PASS|INDEPENDENT_EVIDENCE_VERIFIER_V2|TESTS=4|ALLOWLIST=1|NOVELTY=NO")
 def stage03_preexperiment_readiness(packet, sources, external_review_status):

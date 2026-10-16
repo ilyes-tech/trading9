@@ -582,3 +582,89 @@ def test_preexperiment_nontrading_cost_gate_is_separate():
     revised=check(packet,docs,'SIGNED_INITIAL_REVIEW_REQUEST_FIXED_DEFINITION_NOT_AUTHORIZED')
     assert revised['status']=='PREEXPERIMENT_REVISION_REQUESTED_BY_INDEPENDENT_REVIEW'
     assert revised['new_research_authorized'] is False
+
+
+def test_second_independent_scientific_assessment_intake_cannot_authorize(tmp_path):
+    """Isolated external Ed25519 assessment: exact evidence binding, never permissions."""
+    import hashlib
+    import subprocess
+
+    verify = NS['verify_signed_scientific_assessment']
+    folder = tmp_path / 'stage03_liquidation_source_access_v1'
+    folder.mkdir()
+    index = tmp_path / 'supplemental_review_index.json'
+    index_bytes = json.dumps({
+        'kind': 'OMEGA_STAGE03_INDEPENDENT_REVIEW_HANDOFF_INDEX_V1',
+        'review_packet_sha256': 'a' * 64,
+        'independent_reviewer_signed': False,
+        'scientific_admission': False,
+    }).encode()
+    index.write_bytes(index_bytes)
+    evidence = {}
+    for role in ('target_liquidation_receipts', 'receipt_clock_attestation',
+                 'prospective_preregistration', 'fixed_control_protocol'):
+        path = folder / (role + '.json')
+        path.write_text(json.dumps({'test_fixture_only': role}))
+        evidence[role] = {'filename': path.name, 'sha256': hashlib.sha256(path.read_bytes()).hexdigest()}
+    provenance = folder / 'external_prospective_source_provenance_v1.json'
+    orig = dict(
+        kind='OMEGA_STAGE03_PROSPECTIVE_SOURCE_PROVENANCE_V1',
+        instrument='BINANCE_COINM_BTCUSD_PERP',
+        initial_packet_sha256='a' * 64,
+        review_index_sha256=hashlib.sha256(index_bytes).hexdigest(),
+        research_execution_authorized=False, orders_allowed=False, holdout_allowed=False,
+        sources=evidence,
+    )
+    provenance.write_text(json.dumps(orig, sort_keys=True))
+    review = folder / 'external_scientific_assessment_v1.json'
+    sig = folder / 'external_scientific_assessment_v1.sig'
+    public = tmp_path / 'independent_test_public.pem'
+    private = tmp_path / 'independent_test_private.pem'
+    values = dict(
+        kind='OMEGA_EXTERNAL_STAGE03_SCIENTIFIC_ASSESSMENT_V1',
+        instrument='BINANCE_COINM_BTCUSD_PERP',
+        review_index_sha256=hashlib.sha256(index.read_bytes()).hexdigest(),
+        provenance_sha256=hashlib.sha256(provenance.read_bytes()).hexdigest(),
+        reviewer_id='ISOLATED_TEST_ONLY',
+        decision='ELIGIBLE_FOR_SEPARATE_SCIENTIFIC_ADMISSION_REVIEW_ONLY',
+    )
+    review.write_text(json.dumps(values, sort_keys=True))
+    assert verify(index, provenance, review, sig, public)['status'] == (
+        'DENY_SEPARATE_SCIENTIFIC_REVIEW_AUTHORITY_NOT_PROVISIONED')
+    subprocess.run(['/usr/bin/openssl','genpkey','-algorithm','ED25519','-out',str(private)],
+                   check=True,capture_output=True)
+    subprocess.run(['/usr/bin/openssl','pkey','-in',str(private),'-pubout','-out',str(public)],
+                   check=True,capture_output=True)
+    subprocess.run(['/usr/bin/openssl','pkeyutl','-sign','-inkey',str(private),
+                    '-rawin','-in',str(review),'-out',str(sig)],
+                   check=True,capture_output=True)
+    out = verify(index, provenance, review, sig, public)
+    assert out['status'] == (
+        'SIGNED_SCIENTIFIC_ASSESSMENT_ELIGIBLE_FOR_SEPARATE_SCIENTIFIC_ADMISSION_REVIEW_ONLY_NOT_AUTHORIZED')
+    for key in ('scientific_admission', 'research_execution_authorized',
+                'development_experiment_authorized', 'orders_allowed', 'mt5_allowed',
+                'holdout_allowed', 'auto_promotion_allowed'):
+        assert out[key] is False
+    changed = folder / 'target_liquidation_receipts.json'
+    old_bytes = changed.read_bytes()
+    changed.write_text('tampered')
+    assert verify(index, provenance, review, sig, public)['status'] == 'DENY_SCIENTIFIC_SOURCE_TAMPERED'
+    changed.write_bytes(old_bytes)
+    values['reviewer_id'] = 'CHANGED_AFTER_SIGNING'
+    review.write_text(json.dumps(values, sort_keys=True))
+    assert verify(index, provenance, review, sig, public)['status'] == 'DENY_SCIENTIFIC_REVIEW_SIGNATURE_INVALID'
+    values['reviewer_id'] = 'ISOLATED_TEST_ONLY'
+    review.write_text(json.dumps(values, sort_keys=True))
+    provenance_data = json.loads(provenance.read_text())
+    provenance_data['orders_allowed'] = True
+    provenance.write_text(json.dumps(provenance_data))
+    assert verify(index, provenance, review, sig, public)['status'] == 'DENY_SCIENTIFIC_SOURCE_SCHEMA'
+    provenance.write_text(json.dumps(orig, sort_keys=True))
+    duplicate = json.loads(provenance.read_text())
+    duplicate['sources']['receipt_clock_attestation'] = duplicate['sources']['target_liquidation_receipts']
+    provenance.write_text(json.dumps(duplicate))
+    assert verify(index, provenance, review, sig, public)['status'] == 'DENY_SCIENTIFIC_SOURCE_DUPLICATED'
+    provenance.write_text(json.dumps(orig, sort_keys=True))
+    public.chmod(0o666)
+    assert verify(index, provenance, review, sig, public)['status'] == (
+        'DENY_SEPARATE_SCIENTIFIC_REVIEW_AUTHORITY_NOT_PROVISIONED')

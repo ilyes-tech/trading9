@@ -276,3 +276,117 @@ def verify_signed_initial_review(packet_path, review_path, signature_path, trust
         return result('SIGNED_INITIAL_REVIEW_' + payload['decision'] + '_NOT_AUTHORIZED')
     except (OSError, ValueError, TypeError, UnicodeError, subprocess.TimeoutExpired):
         return result('DENY_INITIAL_REVIEW_UNREADABLE')
+
+
+def verify_signed_scientific_assessment(index_path, provenance_path,
+                                        review_path, signature_path, trust_key_path):
+    """Verify receipt and binding of an externally signed assessment, never grant science or execution.
+
+    Separate root-controlled authority and future-source custody are mandatory.
+    The integrity of a signed statement is NOT proof that its scientific claims are true.
+    """
+    import os
+    import stat
+    import subprocess
+    import tempfile
+
+    safe = dict(scientific_admission=False, research_execution_authorized=False,
+                development_experiment_authorized=False, orders_allowed=False,
+                mt5_allowed=False, holdout_allowed=False, auto_promotion_allowed=False)
+
+    def result(status):
+        return dict(kind='OMEGA_STAGE03_SIGNED_SCIENTIFIC_ASSESSMENT_INTAKE_V1',
+                    status=status, **safe)
+
+    def read(path, max_bytes, root_owned=False):
+        with os.fdopen(os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK), 'rb') as fd:
+            st = os.fstat(fd.fileno())
+            if (not stat.S_ISREG(st.st_mode) or st.st_size <= 0
+                    or st.st_size > max_bytes
+                    or (root_owned and (st.st_uid != 0 or st.st_mode & 0o022))):
+                raise ValueError('UNTRUSTED_OR_OVERSIZED_FILE')
+            return fd.read(max_bytes + 1)
+
+    try:
+        index_bytes = read(index_path, 16384)
+        index = json.loads(index_bytes)
+        provenance_bytes = read(provenance_path, 16384)
+        provenance = json.loads(provenance_bytes)
+        if (not isinstance(index, dict)
+                or index.get('kind') != 'OMEGA_STAGE03_INDEPENDENT_REVIEW_HANDOFF_INDEX_V1'
+                or index.get('independent_reviewer_signed') is not False
+                or index.get('scientific_admission') is not False
+                or not isinstance(provenance, dict)
+                or provenance.get('kind') != 'OMEGA_STAGE03_PROSPECTIVE_SOURCE_PROVENANCE_V1'
+                or provenance.get('instrument') != 'BINANCE_COINM_BTCUSD_PERP'
+                or provenance.get('initial_packet_sha256') != index.get('review_packet_sha256')
+                or provenance.get('review_index_sha256') != hashlib.sha256(index_bytes).hexdigest()
+                or provenance.get('research_execution_authorized') is not False
+                or provenance.get('orders_allowed') is not False
+                or provenance.get('holdout_allowed') is not False):
+            return result('DENY_SCIENTIFIC_SOURCE_SCHEMA')
+        sources = provenance.get('sources')
+        expected = {'target_liquidation_receipts','receipt_clock_attestation',
+                    'prospective_preregistration','fixed_control_protocol'}
+        if not isinstance(sources, dict) or set(sources) != expected:
+            return result('DENY_SCIENTIFIC_SOURCE_SCHEMA')
+        folder = Path(provenance_path).parent
+        used_names = set()
+        for descriptor in sources.values():
+            if not isinstance(descriptor, dict) or set(descriptor) != {'filename','sha256'}:
+                return result('DENY_SCIENTIFIC_SOURCE_SCHEMA')
+            name, sha = descriptor['filename'], descriptor['sha256']
+            if name in used_names:
+                return result('DENY_SCIENTIFIC_SOURCE_DUPLICATED')
+            used_names.add(name)
+            if (not isinstance(name, str) or Path(name).name != name
+                    or name.startswith('.') or not name.endswith('.json')
+                    or not isinstance(sha, str) or len(sha) != 64
+                    or any(c not in '0123456789abcdef' for c in sha)):
+                return result('DENY_SCIENTIFIC_SOURCE_PATH_OR_HASH')
+            if hashlib.sha256(read(folder / name, 2000000)).hexdigest() != sha:
+                return result('DENY_SCIENTIFIC_SOURCE_TAMPERED')
+    except (OSError, ValueError, TypeError, KeyError, UnicodeError, AttributeError):
+        return result('DENY_SCIENTIFIC_SOURCE_NOT_VERIFIED')
+
+    try:
+        key = read(trust_key_path, 4096, root_owned=True)
+    except (OSError, ValueError):
+        return result('DENY_SEPARATE_SCIENTIFIC_REVIEW_AUTHORITY_NOT_PROVISIONED')
+    try:
+        review_bytes = read(review_path, 16384)
+        signature_bytes = read(signature_path, 256)
+        review = json.loads(review_bytes)
+        expected_review = {
+            'kind': 'OMEGA_EXTERNAL_STAGE03_SCIENTIFIC_ASSESSMENT_V1',
+            'instrument': 'BINANCE_COINM_BTCUSD_PERP',
+            'review_index_sha256': hashlib.sha256(index_bytes).hexdigest(),
+            'provenance_sha256': hashlib.sha256(provenance_bytes).hexdigest(),
+        }
+        permitted = {'REJECT_INSUFFICIENT_EVIDENCE', 'REQUEST_ADDITIONAL_EVIDENCE',
+                     'ELIGIBLE_FOR_SEPARATE_SCIENTIFIC_ADMISSION_REVIEW_ONLY'}
+        if (not isinstance(review, dict)
+                or set(review) != set(expected_review) | {'reviewer_id','decision'}
+                or any(review.get(k) != v for k, v in expected_review.items())
+                or review.get('decision') not in permitted
+                or not isinstance(review.get('reviewer_id'), str)
+                or not review['reviewer_id'].strip()):
+            return result('DENY_SCIENTIFIC_REVIEW_BINDING')
+        with tempfile.TemporaryDirectory(prefix='omega-science-review-') as folder_name:
+            temp = Path(folder_name)
+            key_file, review_file, sig_file = (temp / n for n in ('key.pem','review.json','review.sig'))
+            key_file.write_bytes(key)
+            review_file.write_bytes(review_bytes)
+            sig_file.write_bytes(signature_bytes)
+            info = subprocess.run(['/usr/bin/openssl','pkey','-pubin','-in',str(key_file),
+                                   '-text_pub','-noout'],capture_output=True,timeout=6)
+            if info.returncode != 0 or b'ED25519 Public-Key' not in info.stdout:
+                return result('DENY_SCIENTIFIC_REVIEW_KEY_NOT_ED25519')
+            check = subprocess.run(['/usr/bin/openssl','pkeyutl','-verify','-pubin',
+                                    '-inkey',str(key_file),'-sigfile',str(sig_file),
+                                    '-rawin','-in',str(review_file)],capture_output=True,timeout=6)
+        if check.returncode != 0:
+            return result('DENY_SCIENTIFIC_REVIEW_SIGNATURE_INVALID')
+        return result('SIGNED_SCIENTIFIC_ASSESSMENT_' + review['decision'] + '_NOT_AUTHORIZED')
+    except (OSError, ValueError, TypeError, UnicodeError, subprocess.TimeoutExpired):
+        return result('DENY_SCIENTIFIC_REVIEW_UNREADABLE')
