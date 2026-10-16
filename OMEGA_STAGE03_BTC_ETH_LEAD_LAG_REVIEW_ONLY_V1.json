@@ -1,0 +1,77 @@
+{
+  "auto_promotion_allowed": false,
+  "backtest_executed": false,
+  "budget": {
+    "max_holdout_evaluations": 0,
+    "max_hypotheses": 1,
+    "max_parameter_variants": 1,
+    "new_experiments_authorized": 0
+  },
+  "claims": {
+    "independent_replication_proven": false,
+    "new_family_admitted": false,
+    "profitability_expected_or_proven": false,
+    "scientific_novelty_proven": false
+  },
+  "holdout_allowed": false,
+  "hypothesis": "Is the fully closed prior-minute BTC-USD return incrementally predictive of the next ETH-USD M1 return versus ETH own lagged return under realistic transaction costs?",
+  "kind": "OMEGA_STAGE03_BTC_ETH_PUBLIC_LITERATURE_HYPOTHESIS_REVIEW_ONLY_V1",
+  "mechanistic_class": "CROSS_ASSET_LAGGED_PRICE_TRANSMISSION_PUBLISHED_PRIOR_ART",
+  "mt5_allowed": false,
+  "next_step": "INDEPENDENT_REVIEW_OF_DISTINCTNESS_AND_SOURCE_BEFORE_SCOPED_DEVELOPMENT_PERMISSION",
+  "orders_allowed": false,
+  "prior_art": [
+    {
+      "doi": "10.1016/j.jedc.2024.104863",
+      "scope_note": "Binance, 30 cryptocurrencies; positive evidence for cross-crypto lag, not proof of profitable Coinbase BTC/ETH M1 replication",
+      "title": "Cross-cryptocurrency return predictability",
+      "year": 2024
+    },
+    {
+      "doi": "10.1016/j.ribaf.2019.06.012",
+      "scope_note": "Hourly/daily BTC-ETH price leadership mixed and economic exploitability limited",
+      "title": "Lead-Lag relationship between Bitcoin and Ethereum: Evidence from hourly and daily data",
+      "year": 2019
+    },
+    {
+      "doi": "10.1007/s10690-026-09589-z",
+      "scope_note": "Larger altcoins including ETH show mainly contemporaneous rather than lagged responses at minute frequency",
+      "title": "Price Transmission from Bitcoin to Altcoins: High-Frequency Evidence and Implications for Trading Strategy",
+      "year": 2026
+    }
+  ],
+  "proposed_data": {
+    "btc_train_prefix_sha256": "691f294778a2be99b9ae24b2a4ecbec8f987da5f05164699b56a2f305466f4e7",
+    "development_scope_only": true,
+    "eth_train_prefix_sha256": "a45a6eedfcba9430b4789b2f9f14b71ee52e3d1ca72e161b9494c6c692d2943b",
+    "markets": [
+      "BTCUSD",
+      "ETHUSD"
+    ],
+    "paired_timestamp_alignment_check": "PASS_METADATA_ONLY",
+    "paired_train_minute_coverage": 79260,
+    "period": "2025-Q4",
+    "source": "Coinbase Exchange public spot M1 OHLC",
+    "source_manifest_discrepancy_unresolved": true,
+    "validation_or_holdout_accessed": false
+  },
+  "proposed_prediction_contract": {
+    "controls": [
+      "Prior completed ETH M1 log return",
+      "Unconditional zero-predictability baseline"
+    ],
+    "execution_sequencing": "Any later trade signal at close of fully observed source bar; prospective simulated entry no earlier than next ETH M1 opening, fees and slippage required",
+    "information_set": "Only BTC and ETH bars already fully closed at decision time; never current unfinished BTC candle",
+    "missingness": "Reject missing, stale, duplicated or misaligned minute pairs, exclude windows across any gap",
+    "predictor": "Prior completed BTC M1 log return",
+    "risk": "No claims of executable best bid/ask from OHLC; evaluate fees/spread/slippage conservatively or reject if unevidenced",
+    "selection": "No parameter search, no choosing best lag after seeing results; compare the single fixed lag against controls",
+    "target": "Subsequent completed ETH M1 log return strictly after predictor becomes known",
+    "timeframe": "M1"
+  },
+  "reason_not_executed": "NO_VALID_SCIENTIFIC_EXPERIMENT_AUTHORIZATION_AND_FULL_PROVENANCE_NOT_ESTABLISHED",
+  "research_execution_authorized": false,
+  "schema_version": 1,
+  "search_execution_authorized": false,
+  "status": "SOURCE_BACKED_EXPERIMENT_PROPOSAL_NOT_SCIENTIFICALLY_ADMITTED"
+}
