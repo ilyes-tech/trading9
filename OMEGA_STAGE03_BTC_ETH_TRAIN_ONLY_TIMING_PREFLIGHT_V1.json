@@ -45,6 +45,36 @@
   "new_backtest_executed": false,
   "new_family_admitted": false,
   "orders_allowed": false,
+  "original_download_database_train_prefix_reconciliation": {
+    "backtest_executed": false,
+    "comparison_inputs": {
+      "BTCUSD": {
+        "maximum_time_inclusive": 1764054660,
+        "numeric_mismatches": 0,
+        "rows_compared": 79267,
+        "sqlite_product": "BTC-USD",
+        "timestamp_mismatches": 0
+      },
+      "ETHUSD": {
+        "maximum_time_inclusive": 1764054600,
+        "numeric_mismatches": 0,
+        "rows_compared": 79269,
+        "sqlite_product": "ETH-USD",
+        "timestamp_mismatches": 0
+      }
+    },
+    "database_sha256_previous_readonly_file_checksum": "7665a70b9053cb8315c9a05670318fe5ecbdb359f74a5156fbee0432a6499afc",
+    "limitations": [
+      "Source database and CSV are two representations of same local download, so exact matching is not external venue attestation",
+      "Public Coinbase checks separately verified 16/16 sampled training observations, not the entire provider history",
+      "No independent attestation of capture custody or final holdout unreadness is obtained from this check"
+    ],
+    "local_source_database": "hf_lab/database/coinbase_q4_m1_download.sqlite3",
+    "method": "Read-only immutable SQLite query SELECT time,open,high,low,close,volume FROM candles WHERE product=? AND time<=? ORDER BY time; compare against only declared historical 60%-training CSV prefix with exact float equality and timestamps.",
+    "status": "TRAIN_ONLY_FULL_ROW_EXACT_MATCH_LOCAL_CAPTURE_DB_TO_CSV",
+    "total_training_rows_compared": 158536,
+    "validation_or_holdout_sql_rows_queried": 0
+  },
   "paired_common_minutes": 79260,
   "paired_minutes_not_eligible_for_three_consecutive_window": 20,
   "prior_train_triage_sha256": "5cdf59b76b63ab9597b5dd4b012d3f341613c828e6385e66ca34d9aeee71ad99",
