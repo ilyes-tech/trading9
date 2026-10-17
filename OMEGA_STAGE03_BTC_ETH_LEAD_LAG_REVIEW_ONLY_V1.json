@@ -18,7 +18,7 @@
   "kind": "OMEGA_STAGE03_BTC_ETH_PUBLIC_LITERATURE_HYPOTHESIS_REVIEW_ONLY_V1",
   "mechanistic_class": "CROSS_ASSET_LAGGED_PRICE_TRANSMISSION_PUBLISHED_PRIOR_ART",
   "mt5_allowed": false,
-  "next_step": "EXTERNAL_METHOD_AND_DATA_REVIEW_AND_VENUE_FEES_BINDING_BEFORE_SCOPED_SCIENTIFIC_EXECUTION",
+  "next_step": "EXTERNAL_REVIEW_OF_FIXED_CAUSAL_DESIGN_AND_VENUE_COSTS; VERIFY_INDEPENDENT_SCOPED_PERMISSIONS_BEFORE_BACKTEST",
   "orders_allowed": false,
   "prior_art": [
     {
@@ -72,6 +72,22 @@
   "reason_not_executed": "NO_VALID_SCIENTIFIC_EXPERIMENT_AUTHORIZATION; ACTUAL_VENUE_FEES_AND_FULL_PROVENANCE_NOT_ESTABLISHED",
   "research_execution_authorized": false,
   "review_only_fixed_exploratory_development_design": {
+    "actual_train_timing_evidence": {
+      "backtest_executed": false,
+      "causal_clock_source_path": "hf_lab/cross_market_clock.py",
+      "causal_clock_source_sha256": "1bc2a06769016af289080a689a93f9bbab4272fc02ec2e84ad017d36942c8247",
+      "causal_decision_clock_count": 79249,
+      "causal_prefix_stability": "PASS: first 1000 per-market train timestamp bars produce same past decisions as full train timestamp sequence",
+      "difference_caused_by_label_coverage_or_missing_future_bars": 18,
+      "execution_authorized": false,
+      "historical_input_scope": "BTC-USD and ETH-USD 60%-train prefixes; CSV time column only, all price fields replaced by neutral synthetic placeholder",
+      "holdout_accessed": false,
+      "important": "Signal decision schedule must never depend on whether its future outcome label is present. 18 additional decision clocks are legitimate signal scheduling opportunities but cannot all be evaluated from the available complete label set.",
+      "offline_complete_four_minute_label_window_count": 79231,
+      "signals_or_returns_calculated": false,
+      "status": "REAL_TRAIN_TIMESTAMPS_CAUSAL_SCHEDULE_PASS_NO_BACKTEST",
+      "unit_tests": "12 synthetic-only timing tests passed in hf_lab/tests/test_cross_market_clock.py"
+    },
     "assessment_without_tuning": {
       "baseline_comparison": "Same costs and signal delay for ETH own trailing-minute direction control",
       "diagnostics": [
