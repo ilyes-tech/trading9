@@ -89,3 +89,30 @@ def test_synthetic_stage03_to_stage05_replay_decision_memory_handoff():
         }, sort_keys=True))
         assert ingest(evidence_dir) == (1, 1)
         assert ingest(evidence_dir) == (0, 1)
+
+
+
+def test_memory_survives_synthetic_process_restart_without_duplicate():
+    """Two separately loaded interpreters share one *temporary* durable DB."""
+    with TemporaryDirectory(prefix='omega-memory-restart-') as tmp:
+        root = Path(tmp)
+        evidence = root / 'observations'
+        evidence.mkdir()
+        (evidence / 'synthetic.json').write_text(json.dumps({
+            'space': 'SYNTHETIC_ONLY',
+            'status': 'REJECT_NOT_SCIENCE',
+            'result': {'batches': [{'candidates': [{
+                'strategy_id': 'SYNTHETIC_MEMORY_RESTART',
+                'decision': 'REJECT',
+                'deep_status': 'NO_REAL_EVIDENCE',
+            }]}]},
+        }, sort_keys=True))
+        database = root / 'restart.sqlite3'
+        first = runpy.run_path(str(AUTONOMY / 'v57_learning_memory_v2.py'))['ingest']
+        first.__globals__['DB'] = database
+        assert first(evidence) == (1, 1)
+        assert database.exists()
+        second = runpy.run_path(str(AUTONOMY / 'v57_learning_memory_v2.py'))['ingest']
+        second.__globals__['DB'] = database
+        assert second(evidence) == (0, 1)
+        assert database.exists()
