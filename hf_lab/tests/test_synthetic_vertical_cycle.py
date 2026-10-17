@@ -26,6 +26,8 @@ def test_bounded_synthetic_vertical_replay_memory_reject_and_idempotency(tmp_pat
     assert result['cycles'] == 3
     assert result['replay_executions'] == 1
     assert result['closed_synthetic_trades'] == 83
+    assert result['verified_synthetic_shadow_events'] == 83
+    assert result['synthetic_shadow_no_broker_adapter'] is True
     assert result['learning_ticks_inserted'] == [1, 0, 0]
     assert result['learned_observations'] == 1
     assert result['dedup_replay_skips'] == 2
@@ -98,3 +100,43 @@ def test_gate_change_during_synthetic_replay_fails_closed(tmp_path, monkeypatch)
     with pytest.raises(RuntimeError, match='SCIENTIFIC_GATE_CHANGED_DURING_TEST'):
         guarded_synthetic_cycle(tmp_path)
     assert not list(tmp_path.glob('*.sqlite3'))
+
+
+
+def test_shadow_failure_fails_closed_before_memory(tmp_path, monkeypatch):
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    safe_state(tmp_path)
+    def unsafe(*args, **kwargs):
+        raise RuntimeError('SYNTHETIC_MONITOR_STOP')
+    monkeypatch.setattr(cycle, 'inspect_synthetic_shadow', unsafe)
+    with pytest.raises(RuntimeError, match='SYNTHETIC_MONITOR_STOP'):
+        guarded_synthetic_cycle(tmp_path)
+    assert not list(tmp_path.glob('*.sqlite3'))
+
+
+def test_shadow_count_mismatch_fails_closed(tmp_path, monkeypatch):
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    safe_state(tmp_path)
+    old=cycle.smoke.exercise
+    def bad_count(*args, **kwargs):
+        result=old(*args,**kwargs)
+        import sqlite3
+        with sqlite3.connect(args[0]) as c:
+            c.execute('DELETE FROM trades WHERE id=(SELECT MIN(id) FROM trades)')
+        return result
+    monkeypatch.setattr(cycle.smoke, 'exercise', bad_count)
+    with pytest.raises(RuntimeError, match='SYNTHETIC_SHADOW_TRADE_COUNT_CHANGED'):
+        guarded_synthetic_cycle(tmp_path)
+    assert not list(tmp_path.glob('*.sqlite3'))
+
+
+
+def test_repeated_integrated_synthetic_cycles_produce_same_evidence(tmp_path):
+    safe_state(tmp_path)
+    first = guarded_synthetic_cycle(tmp_path)
+    second = guarded_synthetic_cycle(tmp_path)
+    assert first == second
+    assert first['verified_synthetic_shadow_events'] == 83
+    assert first['learning_ticks_inserted'] == [1, 0, 0]
+    assert first['orders_allowed'] is False
+    assert first['real_orders_executed'] is False
