@@ -18,7 +18,7 @@
   "kind": "OMEGA_STAGE03_BTC_ETH_PUBLIC_LITERATURE_HYPOTHESIS_REVIEW_ONLY_V1",
   "mechanistic_class": "CROSS_ASSET_LAGGED_PRICE_TRANSMISSION_PUBLISHED_PRIOR_ART",
   "mt5_allowed": false,
-  "next_step": "REQUIRE_SCOPED_INDEPENDENT_METHOD_AND_DATA_REVIEW_BEFORE_ANY_DEVELOPMENT_BACKTEST",
+  "next_step": "EXTERNAL_METHOD_AND_DATA_REVIEW_AND_VENUE_FEES_BINDING_BEFORE_SCOPED_SCIENTIFIC_EXECUTION",
   "orders_allowed": false,
   "prior_art": [
     {
@@ -69,7 +69,7 @@
     "target": "Subsequent completed ETH M1 log return strictly after predictor becomes known",
     "timeframe": "M1"
   },
-  "reason_not_executed": "NO_VALID_SCIENTIFIC_EXPERIMENT_AUTHORIZATION_AND_FULL_PROVENANCE_NOT_ESTABLISHED",
+  "reason_not_executed": "NO_VALID_SCIENTIFIC_EXPERIMENT_AUTHORIZATION; ACTUAL_VENUE_FEES_AND_FULL_PROVENANCE_NOT_ESTABLISHED",
   "research_execution_authorized": false,
   "review_only_fixed_exploratory_development_design": {
     "assessment_without_tuning": {
@@ -127,6 +127,30 @@
       "slippage_bps_per_side": 1.0,
       "source": "Existing historical engineering replay assumptions, not independently calibrated venue fees"
     },
+    "real_venue_fee_preflight": {
+      "additional_spread_market_impact_and_entry_execution_delay": "Not measured, must not be assumed zero for deployment assessment",
+      "coinbase_exchange_low_volume_maker_roundtrip_fees_only_bps": 80.0,
+      "coinbase_exchange_low_volume_taker_roundtrip_fees_only_bps": 120.0,
+      "coinbase_exchange_low_volume_taker_with_one_bps_slippage_per_side_bps": 122.0,
+      "conclusion": "DO_NOT_TREAT_12BPS_DEVELOPMENT_ASSUMPTION_AS_REPRESENTATIVE_NET_TRADING_COST; REQUIRE_ACTUAL_VENUE_ACCOUNT_COST_BINDING_FOR_REALISTIC_NET_APPROVAL",
+      "engineering_assumption_12bps_roundtrip": 12.0,
+      "method_frozen_for_review": true,
+      "no_performance_estimate_computed": true,
+      "note": "These Coinbase Exchange public fees illustrate a venue-specific cost hurdle; user intends possible MT5 broker execution, whose actual commissions, spreads, swaps and fill rules must be separately verified. Do NOT assert this is the users personal Coinbase or MT5 fee.",
+      "scientific_execution_authorized": false,
+      "status": "HISTORICAL_12_BPS_ENGINEERING_COST_NOT_VALIDATED_FOR_REAL_VENUE",
+      "verified_public_source": {
+        "account_specific_rate_verified": false,
+        "checked_date_utc": "2026-10-17",
+        "historical_2025_fee_rate_verified": false,
+        "maker_bps_per_side": 40.0,
+        "product": "Coinbase Exchange spot (not Coinbase Advanced, not Kraken, not MT5)",
+        "site": "Coinbase Exchange Help",
+        "taker_bps_per_side": 60.0,
+        "url": "https://help.coinbase.com/en/exchange/trading-and-funding/exchange-fees",
+        "volume_tier_usd_rolling_30day": "$0-$10,000"
+      }
+    },
     "source_binding": {
       "dataset": "Coinbase Exchange public spot BTC-USD + ETH-USD, Q4 2025",
       "eligible_four_consecutive_common_minute_starts": 79231,
@@ -139,5 +163,5 @@
   },
   "schema_version": 1,
   "search_execution_authorized": false,
-  "status": "SOURCE_BACKED_EXPERIMENT_PROPOSAL_NOT_SCIENTIFICALLY_ADMITTED"
+  "status": "COST_FEASIBILITY_REVIEWED_SCIENTIFIC_ADMISSION_STILL_DENIED"
 }
