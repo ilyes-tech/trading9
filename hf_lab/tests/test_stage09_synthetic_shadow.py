@@ -149,3 +149,54 @@ def test_nonpositive_shadow_volume_and_impossible_rate_not_accepted(tmp_path):
     drift=DRIFT['assess'](DRIFT['Health'](1,1,0,0.01,0,1))
     assert drift['action']=='QUARANTINE'
     assert 'TRADE_RATE_DRIFT' in drift['reasons']
+
+
+
+@pytest.mark.parametrize('bad',[float('nan'),float('inf'),-float('inf')])
+def test_execution_core_refuses_nonfinite_volume_and_stops(bad):
+    from dataclasses import replace
+    ok=EXEC['Intent']('SYNTHETIC_ONLY','FAKE','BUY',.01,99.,101.,'N')
+    for case in (replace(ok,volume=bad), replace(ok,sl=bad), replace(ok,tp=bad)):
+        result=EXEC['validate'](case,'AUTHORIZE')
+        assert result['status']=='DENY'
+        assert result['reason']=='INVALID_INTENT'
+        assert result['send_allowed'] is False
+    with pytest.raises(ValueError):
+        EXEC['intent_id'](replace(ok,volume=bad))
+
+
+@pytest.mark.parametrize('bad',[float('nan'),float('inf'),-float('inf')])
+def test_digital_twin_never_reports_parity_for_nonfinite_price_or_invalid_tolerance(bad):
+    expected=dict(symbol='FAKE',side='BUY',volume=.01,entry=100.,sl=99.,tp=101.)
+    for key in ('volume','entry','sl','tp'):
+        observed=dict(expected,**{key:bad})
+        result=EXEC['reconcile'](expected,observed)
+        assert result['status']=='DIVERGENCE'
+        assert key in result['mismatches']
+        assert result['send_allowed'] is False
+        twin=EXEC['digital_twin']([expected],[observed])
+        assert twin['status']=='DIVERGENCE'
+        assert twin['promotion_allowed'] is False
+    mismatch=EXEC['reconcile'](expected,dict(expected,entry=100.5),price_tol=bad)
+    assert mismatch['status']=='DIVERGENCE'
+    assert mismatch['promotion_allowed'] is False
+
+
+def test_digital_twin_rejects_corrupt_events_and_boolean_prices():
+    expected=dict(symbol='FAKE',side='BUY',volume=.01,entry=100.,sl=99.,tp=101.)
+    assert EXEC['reconcile'](expected,None)['status']=='DIVERGENCE'
+    result=EXEC['reconcile'](expected,dict(expected,entry=True))
+    assert result['status']=='DIVERGENCE'
+    assert result['send_allowed'] is False
+    good=EXEC['reconcile'](expected,dict(expected))
+    assert good['status']=='PARITY'
+
+
+
+@pytest.mark.parametrize('untrusted',[float('nan'),None,0,1,'True'])
+def test_execution_core_requires_explicit_boolean_health_confirmations(untrusted):
+    intent=EXEC['Intent']('SYNTHETIC_ONLY','FAKE','BUY',.01,99.,101.,'N')
+    a=EXEC['validate'](intent,'AUTHORIZE',market_fresh=untrusted)
+    b=EXEC['validate'](intent,'AUTHORIZE',broker_healthy=untrusted)
+    assert a['status']=='DENY' and a['send_allowed'] is False
+    assert b['status']=='DENY' and b['send_allowed'] is False
