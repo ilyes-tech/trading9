@@ -151,3 +151,24 @@ def test_bad_synthetic_prices_and_temporal_offsets_fail_closed():
                          ('btc_signal', 0), ('eth_prior', -1)):
         with pytest.raises(ValueError):
             review_only_closed_bar_directions(replace(clock, **{field:value}), base, base)
+
+
+def test_subminute_closed_probe_fails_closed():
+    btc = bars([0, 1])
+    eth = bars([0, 1])
+    shifted_btc = [replace(b, time=b.time + timedelta(seconds=30)) for b in btc]
+    shifted_eth = [replace(b, time=b.time + timedelta(seconds=30)) for b in eth]
+    clock = causal_signal_clocks(btc, eth)[0]
+    forged = replace(clock, decision_time=clock.decision_time + timedelta(seconds=30),
+                     earliest_proxy_entry_time=clock.earliest_proxy_entry_time + timedelta(seconds=30))
+    with pytest.raises(ValueError):
+        review_only_closed_bar_directions(forged, shifted_btc, shifted_eth)
+
+
+def test_negative_and_boolean_indices_do_not_alias_real_bars():
+    btc = bars([0, 1])
+    eth = bars([0, 1])
+    clock = causal_signal_clocks(btc, eth)[0]
+    for value in (-1, True):
+        with pytest.raises(ValueError):
+            review_only_closed_bar_directions(replace(clock, btc_prior=value), btc, eth)

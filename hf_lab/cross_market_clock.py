@@ -138,6 +138,11 @@ def review_only_closed_bar_directions(
     strategy scoring is prohibited until an independent scoped authorization.
     Never reads a target bar, its existence, a future price, or any fills.
     """
+    if any(
+        not isinstance(index, int) or isinstance(index, bool) or index < 0
+        for index in (clock.btc_prior, clock.btc_signal, clock.eth_prior, clock.eth_signal)
+    ):
+        raise ValueError("Causal bar indices must be nonnegative integers")
     try:
         btc_previous, btc_signal = btc_bars[clock.btc_prior], btc_bars[clock.btc_signal]
         eth_previous, eth_signal = eth_bars[clock.eth_prior], eth_bars[clock.eth_signal]
@@ -150,6 +155,11 @@ def review_only_closed_bar_directions(
     previous_btc, signal_btc, previous_eth, signal_eth = [
         t.astimezone(timezone.utc) for t in times
     ]
+    if any(
+        not t.timestamp().is_integer() or int(t.timestamp()) % 60
+        for t in (previous_btc, signal_btc)
+    ):
+        raise ValueError("Causal bar times must start on exact UTC-minute boundaries")
     if previous_btc != previous_eth or signal_btc != signal_eth:
         raise ValueError("Cross-market timestamps must align exactly")
     if signal_btc - previous_btc != timedelta(minutes=1):
