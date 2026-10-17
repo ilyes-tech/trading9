@@ -42,6 +42,47 @@ def _minute_indices(bars: Sequence[Bar]) -> dict[int, int]:
     return positions
 
 
+@dataclass(frozen=True, slots=True)
+class CausalSignalClock:
+    """Signal decision using only two *already closed* bars on each market."""
+
+    decision_time: datetime
+    earliest_proxy_entry_time: datetime
+    btc_prior: int
+    btc_signal: int
+    eth_prior: int
+    eth_signal: int
+
+
+def causal_signal_clocks(
+    btc_bars: Sequence[Bar], eth_bars: Sequence[Bar]
+) -> tuple[CausalSignalClock, ...]:
+    """Return decision clocks, independent of all future label availability.
+
+    For a bar starting at t, both markets' t and t-60s bars must exist.
+    Signals become available only after the t bar closes at t+60s.
+    The earliest conservative proxy entry is scheduled at t+120s.
+    No future timestamp, price, outcome or target bar is consulted.
+    This function computes NO market signal and grants NO execution rights.
+    """
+    btc = _minute_indices(btc_bars)
+    eth = _minute_indices(eth_bars)
+    common = btc.keys() & eth.keys()
+    decisions: list[CausalSignalClock] = []
+    for t in sorted(common):
+        if t - 60 not in common:
+            continue
+        decisions.append(CausalSignalClock(
+            decision_time=datetime.fromtimestamp(t + 60, tz=timezone.utc),
+            earliest_proxy_entry_time=datetime.fromtimestamp(t + 120, tz=timezone.utc),
+            btc_prior=btc[t - 60],
+            btc_signal=btc[t],
+            eth_prior=eth[t - 60],
+            eth_signal=eth[t],
+        ))
+    return tuple(decisions)
+
+
 def aligned_four_minute_pairs(
     btc_bars: Sequence[Bar], eth_bars: Sequence[Bar]
 ) -> tuple[FourMinutePair, ...]:

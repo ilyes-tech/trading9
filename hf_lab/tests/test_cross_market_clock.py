@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from hf_lab.replay import Bar
-from hf_lab.cross_market_clock import aligned_four_minute_pairs
+from hf_lab.cross_market_clock import aligned_four_minute_pairs, causal_signal_clocks
 
 
 START = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -57,3 +57,49 @@ def test_price_mutations_cannot_change_alignment():
     source = bars(range(6))
     changed = [replace(b, close=999999.0) for b in source]
     assert aligned_four_minute_pairs(source, source) == aligned_four_minute_pairs(changed, source)
+
+
+def test_live_decision_clock_requires_no_future_label_bar():
+    btc = bars([0, 1])
+    eth = bars([0, 1])
+    signals = causal_signal_clocks(btc, eth)
+    assert len(signals) == 1
+    first = signals[0]
+    assert first.decision_time == START + timedelta(minutes=2)
+    assert first.earliest_proxy_entry_time == START + timedelta(minutes=3)
+    assert first.btc_signal == first.eth_signal == 1
+    # Historical label coverage must NOT determine the signal decision.
+    assert aligned_four_minute_pairs(btc, eth) == ()
+
+
+def test_future_candles_cannot_remove_or_change_past_decisions():
+    original = causal_signal_clocks(bars([0, 1, 2]), bars([0, 1, 2]))
+    extended = causal_signal_clocks(
+        bars([0, 1, 2, 3, 4, 5]),
+        bars([0, 1, 2, 4, 5]),
+    )
+    assert len(original) == 2
+    assert extended[:2] == original
+
+
+def test_historical_label_gap_does_not_remove_past_signal():
+    btc = bars([0, 1, 2, 3])
+    eth = bars([0, 1, 3])
+    times = [d.decision_time for d in causal_signal_clocks(btc, eth)]
+    assert times == [START + timedelta(minutes=2)]
+    assert aligned_four_minute_pairs(btc, eth) == ()
+
+
+def test_future_price_mutation_does_not_change_decision_schedule():
+    original = bars(range(6))
+    changed = [replace(b, high=10**10, close=10**10) for b in original]
+    assert causal_signal_clocks(original, original) == causal_signal_clocks(changed, original)
+
+
+def test_invalid_timestamps_fail_closed_for_signal_clock():
+    with pytest.raises(ValueError):
+        causal_signal_clocks(bars([0, 0, 1]), bars([0, 1]))
+    missing_tz = bars([0, 1])
+    missing_tz[1] = replace(missing_tz[1], time=datetime(2026, 1, 1, 0, 1))
+    with pytest.raises(ValueError):
+        causal_signal_clocks(missing_tz, bars([0, 1]))
