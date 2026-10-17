@@ -14,7 +14,7 @@ def validate(i, risk_decision, market_fresh=True, broker_healthy=True, mode='SHA
  if risk_decision not in {'AUTHORIZE','REDUCE'}: return {'status':'DENY','reason':'RISK_DENIED','send_allowed':False}
  if market_fresh is not True: return {'status':'DENY','reason':'STALE_MARKET','send_allowed':False}
  if broker_healthy is not True: return {'status':'DENY','reason':'BROKER_UNHEALTHY','send_allowed':False}
- if i.side not in {'BUY','SELL'} or any(not _positive_finite(value) for value in (i.volume,i.sl,i.tp)): return {'status':'DENY','reason':'INVALID_INTENT','send_allowed':False}
+ if (any(not isinstance(v,str) or not v.strip() for v in (i.strategy_id,i.symbol,i.nonce)) or i.side not in {'BUY','SELL'} or any(not _positive_finite(value) for value in (i.volume,i.sl,i.tp))): return {'status':'DENY','reason':'INVALID_INTENT','send_allowed':False}
  return {'status':'ACCEPT_SHADOW','reason':'VALIDATED','send_allowed':False,'intent_id':intent_id(i)}
 class Deduplicator:
  def __init__(self): self.seen=set()
@@ -27,7 +27,12 @@ def reconcile(expected, observed, price_tol=1e-9, volume_tol=1e-12):
     if not isinstance(expected,dict) or not isinstance(observed,dict):
         return {'status':'DIVERGENCE','mismatches':['INVALID_EVENT'],'promotion_allowed':False,'send_allowed':False}
     keys=('symbol','side')
-    mismatches=[k for k in keys if expected.get(k)!=observed.get(k)]
+    mismatches=[k for k in keys if
+      not isinstance(expected.get(k),str) or not expected.get(k).strip() or
+      not isinstance(observed.get(k),str) or not observed.get(k).strip() or
+      expected.get(k)!=observed.get(k)]
+    if expected.get('side') not in ('BUY','SELL') and 'side' not in mismatches:
+        mismatches.append('side')
     for k,t in [('volume',volume_tol),('entry',price_tol),('sl',price_tol),('tp',price_tol)]:
         try:
             a,b=expected.get(k),observed.get(k)
@@ -41,6 +46,8 @@ def reconcile(expected, observed, price_tol=1e-9, volume_tol=1e-12):
     return {'status':'PARITY' if not mismatches else 'DIVERGENCE','mismatches':mismatches,'promotion_allowed':False,'send_allowed':False}
 
 def digital_twin(expected_events, observed_events):
+    if not expected_events or not observed_events:
+        return {'status':'DIVERGENCE','reason':'NO_COMPLETE_EVENTS','promotion_allowed':False,'send_allowed':False}
     if len(expected_events)!=len(observed_events): return {'status':'DIVERGENCE','reason':'EVENT_COUNT','first_divergence':min(len(expected_events),len(observed_events)),'promotion_allowed':False}
     for n,(e,o) in enumerate(zip(expected_events,observed_events)):
         r=reconcile(e,o)

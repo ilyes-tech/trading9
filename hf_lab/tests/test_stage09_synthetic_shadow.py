@@ -200,3 +200,32 @@ def test_execution_core_requires_explicit_boolean_health_confirmations(untrusted
     b=EXEC['validate'](intent,'AUTHORIZE',broker_healthy=untrusted)
     assert a['status']=='DENY' and a['send_allowed'] is False
     assert b['status']=='DENY' and b['send_allowed'] is False
+
+
+
+@pytest.mark.parametrize('field', ['strategy_id','symbol','nonce'])
+def test_intent_identity_is_required_before_shadow_acceptance(field):
+    from dataclasses import replace
+    valid=EXEC['Intent']('SYNTHETIC','FAKE','BUY',0.01,99.,101.,'synthetic-1')
+    for broken in ('', '   ', None, 0):
+        result=EXEC['validate'](replace(valid,**{field:broken}),'AUTHORIZE')
+        assert result['status']=='DENY' and result['send_allowed'] is False
+    assert EXEC['validate'](valid,'AUTHORIZE')['status']=='ACCEPT_SHADOW'
+
+
+def test_missing_identity_and_empty_twin_are_never_accepted():
+    expected=dict(symbol='FAKE',side='BUY',volume=.01,entry=100.,sl=99.,tp=101.)
+    for field in ('symbol','side'):
+        missing=dict(expected)
+        missing.pop(field)
+        result=EXEC['reconcile'](missing,missing)
+        assert result['status']=='DIVERGENCE' and field in result['mismatches']
+        assert result['send_allowed'] is False
+    for side in ('UNKNOWN','',None):
+        malformed=dict(expected,side=side)
+        assert EXEC['reconcile'](malformed,malformed)['status']=='DIVERGENCE'
+    twin=EXEC['digital_twin']([],[])
+    assert twin['status']=='DIVERGENCE'
+    assert twin['reason']=='NO_COMPLETE_EVENTS'
+    assert twin['promotion_allowed'] is False
+    assert EXEC['digital_twin']([expected],[dict(expected)])['status']=='PARITY'
