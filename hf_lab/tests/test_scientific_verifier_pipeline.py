@@ -84,3 +84,46 @@ def test_search_gate_never_trusts_forged_admission_flags(tmp_path):
     decision = json.loads((tmp_path / 'search_authorization_v1.json').read_text())
     assert 'UNTRUSTED_SCIENTIFIC_ADMISSION_STATUS' in decision['reasons']
     assert decision['authorized'] is False
+
+
+
+def test_secondary_search_execution_gate_rejects_forged_authorization_without_independent_proof(tmp_path):
+    """A forged authorization document cannot start or make the Searcher READY."""
+    ns = runpy.run_path(str(A / 'v57_search_execution_gate_v1.py'))
+    main = ns['main']
+    main.__globals__['S'] = tmp_path
+    write(tmp_path / 'bounded_objective_v1.json', {'objective_id': 'SYNTHETIC_UNAPPROVED'})
+    for candidate_budget in (1, 2, 4):
+        write(tmp_path / 'search_authorization_v1.json', {
+            'status': 'AUTHORIZED', 'authorized': True, 'reasons': [],
+            'max_candidates': candidate_budget, 'execution_started': False,
+            'orders_allowed': False, 'mt5_allowed': False, 'holdout_allowed': False,
+        })
+        assert main() == 3
+        actual = json.loads((tmp_path / 'search_execution_gate_v1.json').read_text())
+        assert actual['status'] == 'DENIED'
+        assert actual['ready'] is False
+        assert actual['search_process_started'] is False
+        assert actual['budget_candidates'] == 0
+        assert actual['execution_token'] is None
+        assert actual['orders_allowed'] is False
+        assert 'INDEPENDENT_SCIENTIFIC_EXECUTION_AUTHORITY_NOT_PROVISIONED' in actual['reasons']
+        if candidate_budget != 1:
+            assert 'ONE_CANDIDATE_EXPERIMENT_BUDGET_REQUIRED' in actual['reasons']
+
+
+def test_secondary_search_execution_gate_rejects_malformed_authorization(tmp_path):
+    ns = runpy.run_path(str(A / 'v57_search_execution_gate_v1.py'))
+    main = ns['main']
+    main.__globals__['S'] = tmp_path
+    write(tmp_path / 'bounded_objective_v1.json', {'objective_id':'TEST_NO_EXECUTION'})
+    for status, reasons, budget in (('DENIED', [], 1), ('AUTHORIZED', ['REVIEW_MISSING'], 1),
+                                     ('AUTHORIZED', [], True), ('AUTHORIZED', [], 0)):
+        write(tmp_path / 'search_authorization_v1.json', {
+            'status':status, 'authorized': True,'reasons':reasons,
+            'max_candidates':budget,'execution_started':False,
+        })
+        assert main() == 3
+        gate=json.loads((tmp_path/'search_execution_gate_v1.json').read_text())
+        assert gate['status']=='DENIED' and gate['ready'] is False
+        assert gate['search_process_started'] is False and gate['execution_token'] is None

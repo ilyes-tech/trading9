@@ -7,9 +7,15 @@ def load(n):
 def main():
  a=load('search_authorization_v1.json');o=load('bounded_objective_v1.json'); reasons=[]
  if a.get('authorized') is not True: reasons.append('AUTHORIZATION_DENIED')
+ if a.get('status') != 'AUTHORIZED' or a.get('reasons') != []:
+  reasons.append('UNTRUSTED_AUTHORIZATION_DOCUMENT')
+ # A JSON authorization flag is not independent scientific authority.
+ # Keep this secondary gate closed until a separately approved, verified
+ # signature-bound BTC/ETH experiment permission has been implemented.
+ reasons.append('INDEPENDENT_SCIENTIFIC_EXECUTION_AUTHORITY_NOT_PROVISIONED')
  if a.get('execution_started') is not False: reasons.append('AUTHORIZATION_ALREADY_CONSUMED')
  budget=a.get('max_candidates',0)
- if not isinstance(budget,int) or budget<1 or budget>4: reasons.append('INVALID_BUDGET')
+ if type(budget) is not int or budget != 1: reasons.append('ONE_CANDIDATE_EXPERIMENT_BUDGET_REQUIRED')
  oid=o.get('objective_id')
  if not oid: reasons.append('OBJECTIVE_ID_MISSING')
  token=hashlib.sha256((str(oid)+'|'+str(budget)).encode()).hexdigest() if oid else None
