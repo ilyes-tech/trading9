@@ -6,8 +6,9 @@ A scientific execution gate is still required before using a window in a backtes
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Sequence
+import math
 
 from hf_lab.replay import Bar
 
@@ -114,3 +115,57 @@ def aligned_four_minute_pairs(
             eth_exit=eth[t + 120],
         ))
     return tuple(result)
+
+
+@dataclass(frozen=True, slots=True)
+class ReviewOnlyDirectionalProbe:
+    """Unadmitted synthetic-test probe, not a trading or research approval."""
+
+    decision_time: datetime
+    earliest_proxy_entry_time: datetime
+    btc_direction: int
+    eth_self_control_direction: int
+
+
+def review_only_closed_bar_directions(
+    clock: CausalSignalClock,
+    btc_bars: Sequence[Bar],
+    eth_bars: Sequence[Bar],
+) -> ReviewOnlyDirectionalProbe:
+    """Calculate the *fixed* two-asset hypothesis only from closed OHLC bars.
+
+    This pure function can be verified on SYNTHETIC examples. Market-history
+    strategy scoring is prohibited until an independent scoped authorization.
+    Never reads a target bar, its existence, a future price, or any fills.
+    """
+    try:
+        btc_previous, btc_signal = btc_bars[clock.btc_prior], btc_bars[clock.btc_signal]
+        eth_previous, eth_signal = eth_bars[clock.eth_prior], eth_bars[clock.eth_signal]
+    except (IndexError, TypeError) as exc:
+        raise ValueError("Invalid causal signal bar indices") from exc
+
+    times = [bar.time for bar in (btc_previous, btc_signal, eth_previous, eth_signal)]
+    if any(t.tzinfo is None or t.utcoffset() is None for t in times):
+        raise ValueError("All bar timestamps must be timezone-aware")
+    previous_btc, signal_btc, previous_eth, signal_eth = [
+        t.astimezone(timezone.utc) for t in times
+    ]
+    if previous_btc != previous_eth or signal_btc != signal_eth:
+        raise ValueError("Cross-market timestamps must align exactly")
+    if signal_btc - previous_btc != timedelta(minutes=1):
+        raise ValueError("Signal must use two consecutive closed minute bars")
+    if clock.decision_time != signal_btc + timedelta(minutes=1):
+        raise ValueError("Decision must occur after signal bar closure")
+    if clock.earliest_proxy_entry_time != clock.decision_time + timedelta(minutes=1):
+        raise ValueError("One-minute delay to entry is required")
+    values = [b.close for b in (btc_previous, btc_signal, eth_previous, eth_signal)]
+    if any(not math.isfinite(v) or v <= 0 for v in values):
+        raise ValueError("Signal closes must be positive and finite")
+    def direction(previous: float, latest: float) -> int:
+        return int(latest > previous) - int(latest < previous)
+    return ReviewOnlyDirectionalProbe(
+        decision_time=clock.decision_time,
+        earliest_proxy_entry_time=clock.earliest_proxy_entry_time,
+        btc_direction=direction(btc_previous.close, btc_signal.close),
+        eth_self_control_direction=direction(eth_previous.close, eth_signal.close),
+    )

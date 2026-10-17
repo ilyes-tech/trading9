@@ -5,7 +5,7 @@ from dataclasses import replace
 import pytest
 
 from hf_lab.replay import Bar
-from hf_lab.cross_market_clock import aligned_four_minute_pairs, causal_signal_clocks
+from hf_lab.cross_market_clock import aligned_four_minute_pairs, causal_signal_clocks, review_only_closed_bar_directions
 
 
 START = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -103,3 +103,51 @@ def test_invalid_timestamps_fail_closed_for_signal_clock():
     missing_tz[1] = replace(missing_tz[1], time=datetime(2026, 1, 1, 0, 1))
     with pytest.raises(ValueError):
         causal_signal_clocks(missing_tz, bars([0, 1]))
+
+
+def test_synthetic_closed_bar_probe_uses_prior_btc_and_eth_control():
+    btc = bars([0, 1])
+    eth = bars([0, 1])
+    btc[0] = replace(btc[0], close=100.)
+    btc[1] = replace(btc[1], close=101.)
+    eth[0] = replace(eth[0], close=100.)
+    eth[1] = replace(eth[1], close=99.)
+    clock = causal_signal_clocks(btc, eth)[0]
+    result = review_only_closed_bar_directions(clock, btc, eth)
+    assert result.btc_direction == 1
+    assert result.eth_self_control_direction == -1
+    assert result.decision_time == START + timedelta(minutes=2)
+    assert result.earliest_proxy_entry_time == START + timedelta(minutes=3)
+
+
+def test_synthetic_no_change_is_no_signal():
+    btc = bars([0, 1])
+    eth = bars([0, 1])
+    signal = review_only_closed_bar_directions(causal_signal_clocks(btc, eth)[0], btc, eth)
+    assert signal.btc_direction == 0
+    assert signal.eth_self_control_direction == 0
+
+
+def test_future_prices_and_labels_cannot_change_closed_probe():
+    original = bars(range(5))
+    clock = causal_signal_clocks(original[:2], original[:2])[0]
+    expected = review_only_closed_bar_directions(clock, original, original)
+    altered = list(original)
+    for i in (2, 3, 4):
+        altered[i] = replace(altered[i], close=1000000., open=9999., high=1000001.)
+    assert review_only_closed_bar_directions(clock, altered, original) == expected
+    assert review_only_closed_bar_directions(clock, original, altered) == expected
+
+
+def test_bad_synthetic_prices_and_temporal_offsets_fail_closed():
+    base = bars([0, 1])
+    clock = causal_signal_clocks(base, base)[0]
+    for value in (0., -1., float('nan'), float('inf'), -float('inf')):
+        bad = [replace(base[0], close=value), base[1]]
+        with pytest.raises(ValueError):
+            review_only_closed_bar_directions(clock, bad, base)
+    for field, value in (('decision_time', START + timedelta(minutes=1)),
+                         ('earliest_proxy_entry_time', START + timedelta(minutes=2)),
+                         ('btc_signal', 0), ('eth_prior', -1)):
+        with pytest.raises(ValueError):
+            review_only_closed_bar_directions(replace(clock, **{field:value}), base, base)
