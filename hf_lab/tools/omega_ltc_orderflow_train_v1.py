@@ -94,11 +94,20 @@ def read_march(root: Path) -> tuple[dict, ...]:
 def summarize(pnl: list[float], count: int, missing: int) -> dict:
     gains = math.fsum(v for v in pnl if v > 0)
     losses = -math.fsum(v for v in pnl if v < 0)
+    # These samples exclude entry/exit periods based on FUTURE trade activity;
+    # they are post-hoc *label coverage*, not ex-ante executable positions.
+    # No subsequent system may promote this conditional proxy into a live PF.
+    gross_sum = math.fsum(pnl) + len(pnl) * COST_BPS
     return {
         "signal_or_baseline_schedules": count,
         "scored_roundtrips": len(pnl),
         "unscorable_zero_trade_entry_or_exit": missing,
+        "selection_conditioned_on_future_entry_exit_trade_activity": missing > 0,
+        "sample_not_valid_for_ex_ante_execution_pf": True,
         "assumed_roundtrip_cost_bps": COST_BPS,
+        "gross_log_return_bps_sum_in_scored_subset": round(gross_sum, 4),
+        "mean_gross_bps_in_scored_subset": round(gross_sum / len(pnl), 6) if pnl else None,
+        "mean_net_bps_in_scored_subset": round(math.fsum(pnl) / len(pnl), 6) if pnl else None,
         "net_log_return_bps_sum": round(math.fsum(pnl), 4),
         "proxy_net_pf": round(gains / losses, 8) if losses > 0 else None,
         "actual_executable_net_pf_verified": False,

@@ -26,6 +26,10 @@ def test_frozen_long_only_and_nonoverlapping():
     assert report["holdout_or_future_months_read"] is False
     assert report["source_market_is_spot"] is True
     assert report["candidate"]["actual_executable_net_pf_verified"] is False
+    assert report["candidate"]["sample_not_valid_for_ex_ante_execution_pf"] is True
+    candidate = report["candidate"]
+    assert abs(candidate["mean_net_bps_in_scored_subset"]
+               - (candidate["mean_gross_bps_in_scored_subset"] - m.COST_BPS)) < 0.000002
 
 
 def test_future_price_cannot_change_past_signal_scheduling():
@@ -61,6 +65,8 @@ def test_future_nontrade_data_not_used_to_choose_signal():
     b=m.screen(tuple(rows))
     assert a["candidate"]["signal_or_baseline_schedules"]==b["candidate"]["signal_or_baseline_schedules"]
     assert b["candidate"]["unscorable_zero_trade_entry_or_exit"]>=1
+    assert b["candidate"]["selection_conditioned_on_future_entry_exit_trade_activity"] is True
+    assert b["candidate"]["sample_not_valid_for_ex_ante_execution_pf"] is True
 
 
 def test_reject_short_source_and_missing_prior_review(tmp_path, monkeypatch):
