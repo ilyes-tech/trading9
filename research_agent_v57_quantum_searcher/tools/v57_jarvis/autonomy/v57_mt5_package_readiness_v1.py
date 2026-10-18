@@ -8,10 +8,60 @@ def load(p):
  if p.is_symlink() or not p.is_file():return None
  return json.loads(p.read_text())
 def canon(v):return json.dumps(v,sort_keys=True,separators=(",",":"))
+def broker_cost_blockers(connection, archived_spread, cost_binding, source_export):
+    """Separate broker-account execution evidence from old historical MT5 spreads.
+
+    This adds a packaging-REVIEW prerequisite; it cannot authorize orders.
+    The future cost binding must refer to the very same read-only broker account,
+    and raw exported evidence must be SHA256-bound, not a bare status toggle.
+    """
+    reasons=[]
+    connected=(isinstance(connection,dict)
+        and connection.get("status")=="VERIFIED_READONLY_DEMO_BROKER_ACCOUNT"
+        and connection.get("account_specific_broker_authenticated") is True
+        and connection.get("broker_server_selected") is True
+        and isinstance(connection.get("server"),str) and bool(connection["server"])
+        and isinstance(connection.get("account_ref_hash"),str)
+        and len(connection["account_ref_hash"])==64)
+    if not connected:
+        reasons.append("MT5_DEMO_BROKER_CONNECTION_UNVERIFIED")
+    # March MT5 archive is a useful reference, not proof of current account costs.
+    if (not isinstance(archived_spread,dict)
+            or archived_spread.get("status")!="PASS_ARCHIVED_DEV_SPREAD_PROVENANCE_ONLY_BROKER_COST_BINDING_INCOMPLETE"
+            or archived_spread.get("scientific_admission") is not False
+            or archived_spread.get("orders_allowed") is not False
+            or archived_spread.get("holdout_read") is not False):
+        reasons.append("ARCHIVED_SPREAD_PROVENANCE_UNVERIFIED")
+    valid=(connected and isinstance(cost_binding,dict)
+        and cost_binding.get("status")=="BROKER_ACCOUNT_COST_INPUTS_VERIFIED_FOR_REVIEW_ONLY"
+        and cost_binding.get("kind")=="OMEGA_MT5_BROKER_COST_INPUT_BINDING_V1"
+        and cost_binding.get("server")==connection["server"]
+        and cost_binding.get("account_ref_hash")==connection["account_ref_hash"]
+        and cost_binding.get("commission_for_account_verified") is True
+        and cost_binding.get("bid_ask_spread_for_account_verified") is True
+        and cost_binding.get("swap_for_account_verified") is True
+        and cost_binding.get("fill_policy_for_account_verified") is True
+        and cost_binding.get("orders_allowed") is False
+        and cost_binding.get("scientific_admission") is False
+        and cost_binding.get("holdout_read") is False
+        and isinstance(source_export,dict)
+        and source_export.get("kind")=="OMEGA_MT5_READONLY_ACCOUNT_COST_EXPORT_V1"
+        and source_export.get("read_only") is True
+        and source_export.get("orders_sent") is False
+        and source_export.get("server")==connection["server"]
+        and source_export.get("account_ref_hash")==connection["account_ref_hash"]
+        and cost_binding.get("source_export_sha256")==hashlib.sha256(canon(source_export).encode()).hexdigest())
+    # A matching hash proves exact source linkage, NOT third-party certification.
+    # Package output stays review-only: human approval and scientific gates
+    # remain mandatory before any execution.
+    if not valid:
+        reasons.append("MT5_EXECUTABLE_BROKER_COST_AND_FILL_AUTHORITY_NOT_PROVISIONED")
+    return reasons
+
 def main():
  d=load(S/"phase2_deep_validation_v1.json")
  result=load(S/"phase2_scientific_result_v1.json")
- reasons=[]
+ reasons=broker_cost_blockers(load(S/"stage03_mt5_demo_connection_readonly_precheck_v1.json"),load(S/"stage03_mt5_march_development_spread_preflight_v1.json"),load(S/"stage03_mt5_broker_cost_input_binding_v1.json"),load(S/"stage03_mt5_readonly_account_cost_export_v1.json"))
  sid=d.get("strategy_id") if d else None
  if not d or d.get("status")!="COMPLETED" or (d.get("deep") or {}).get("status")!="DEEP_PASS" or d.get("independent_replay_exact_pass") is not True:reasons.append("DEEP_PASS_MISSING")
  if not result or not d or result.get("execution_token")!=d.get("execution_token"):reasons.append("SCIENTIFIC_BINDING_MISSING")
