@@ -39,6 +39,18 @@ Ce complément est une QUESTION DE REVUE, pas une modification du protocole fige
 - **Permission experimentale separee, encore absente :** autorisation de revue scientifique limitee a UNE hypothese, une seule periode train-prefix, des fichiers de donnees/code/config empreintes, des couts de venue justifies, un budget fini, un arret en cas d'anomalie et zero ordre. Aucune nouvelle permission tant que cet accord independant et son enforcement fail-closed ne sont pas verifies. Une decision REJECT de l'evaluateur interdit naturellement toute experience.
 - **Statut :** OBSERVATION TECHNIQUE VERIFIEE, PAS UNE REVUE EXTERNE. Aucun avis emis ni recu, aucune preuve de PF, aucune autorisation de recherche ou de trading.
 
+### Contrat minimal de la premiere experience BTC-ETH — non autorisee
+
+**Objet unique** : BTC_TO_ETH_ONE_MINUTE_DELAY_DIRECTION_BASELINE_V1, predictor = direction de la minute BTC entierement cloturee, temoin = direction ETH de sa propre minute anterieure. Une seule variante, aucun Searcher aleatoire, aucun ajustement du lag apres lecture des resultats.
+
+**Source reservee au developpement** : Coinbase Exchange SPOT BTC-USD / ETH-USD, 2025-Q4, prefixes train 60 % uniquement. Les empreintes train-developpement deja documentees dans OMEGA_STAGE03_BTC_ETH_LEAD_LAG_REVIEW_ONLY_V1.json doivent etre liees a un contrat avant ouverture. Validation/holdout = zero lecture.
+
+**Chronologie** : decision seulement apres cloture complete des barres de BTC et ETH, entree-proxy ETH a partir de t+120s, exclusion des lacunes/duplicatas/horodatages decales. Le prix OHLC n'est pas une execution a un cours realisable.
+
+**Cout et decision** : frais/spread/slippage du produit reel a justifier, et possibilite du SHORT ETH a documenter; 12 bps engineering ne prouve aucune fidelite. Rapporter PF net, nombre de trades, drawdown, baseline ETH, concentration et limites. Accepter REJECT comme resultat valable. Zero ordre demo/reel.
+
+**Porte actuelle et route** : le concepteur existant v57_experiment_designer_v3.py genere 4 candidats XAUUSD M5 SHORT, et v57_scientist_v4_execution_binding_v1.py appelle Scientist V4 pour ce parcours historique. **Ce n'est PAS l'executeur BTC-ETH M1**. Il ne faut ni forcer l'objectif existant ni lever la porte Searcher pour obtenir artificiellement une experience BTC-ETH. Le prochain livrable reel n'est possible qu'apres une evaluation independante du protocole et une permission specifique **signee, bornee a 1 experience, verifiee fail-closed**, puis un chemin d'execution explicitement raccorde au contrat BTC-ETH. Aucun executeur ainsi autorise n'existe actuellement.
+
 **STOP de construction volontaire :** ne plus ajouter de variantes, features, sondes ou archives pour masquer ce verrou. Ne reprendre les modifications que pour une correction justifiee par l'avis scientifique reel ou pour une procedure de permission independante formellement revue. Ne pas lancer de backtest ni ouvrir le holdout.
 
 
