@@ -29,7 +29,7 @@ def main():
  if r.get('decision') not in {'IDLE','SAFE_RESUME'}: reasons.append('RESUME_STATE_UNSAFE')
  # Phase-2 gate is authorization-only. It never launches the searcher itself.
  admitted=not reasons
- out={'schema_version':1,'kind':'JARVIS_SEARCH_AUTHORIZATION_GATE_V1','status':'AUTHORIZED' if admitted else 'DENIED','reasons':reasons,'authorized':admitted,'max_candidates':4 if admitted else 0,'next_required_capability':'VERIFY_INTEGRATED_TECHNICAL_EVIDENCE_PIPELINE' if 'TECHNICAL_EVIDENCE_VERIFIER_NOT_VERIFIED' in reasons else 'OBTAIN_EXTERNAL_SCIENTIFIC_REVIEW_AND_PROSPECTIVE_EVIDENCE','execution_started':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
+ out={'schema_version':1,'kind':'JARVIS_SEARCH_AUTHORIZATION_GATE_V1','status':'AUTHORIZED' if admitted else 'DENIED','reasons':reasons,'authorized':admitted,'max_candidates':1 if admitted else 0,'next_required_capability':'VERIFY_INTEGRATED_TECHNICAL_EVIDENCE_PIPELINE' if 'TECHNICAL_EVIDENCE_VERIFIER_NOT_VERIFIED' in reasons else 'OBTAIN_EXTERNAL_SCIENTIFIC_REVIEW_AND_PROSPECTIVE_EVIDENCE','execution_started':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False,'auto_promotion_allowed':False}
  review=evidence.get('replay_review')
  out['replay_review_status']=review.get('status') if isinstance(review,dict) else 'REVIEW_NOT_REPORTED'
  out['replay_review_reason']=review.get('reason') if isinstance(review,dict) else None

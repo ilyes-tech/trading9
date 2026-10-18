@@ -87,6 +87,15 @@ def test_search_gate_never_trusts_forged_admission_flags(tmp_path):
 
 
 
+def test_scientific_search_gate_future_max_budget_is_one_without_permission():
+    """The eventual global admission must not offer 4 candidates for a one-shot protocol."""
+    ns = runpy.run_path(str(A / 'v57_search_authorization_gate_v1.py'))
+    source = (A / 'v57_search_authorization_gate_v1.py').read_text()
+    assert "'max_candidates':1 if admitted else 0" in source
+    assert "reasons.append('INDEPENDENT_SCIENTIFIC_ADMISSION_NOT_AVAILABLE')" in source
+    assert callable(ns['main'])
+
+
 def test_secondary_search_execution_gate_rejects_forged_authorization_without_independent_proof(tmp_path):
     """A forged authorization document cannot start or make the Searcher READY."""
     ns = runpy.run_path(str(A / 'v57_search_execution_gate_v1.py'))
