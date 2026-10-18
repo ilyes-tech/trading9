@@ -51,11 +51,15 @@ def broker_cost_blockers(connection, archived_spread, cost_binding, source_expor
         and source_export.get("server")==connection["server"]
         and source_export.get("account_ref_hash")==connection["account_ref_hash"]
         and cost_binding.get("source_export_sha256")==hashlib.sha256(canon(source_export).encode()).hexdigest())
-    # A matching hash proves exact source linkage, NOT third-party certification.
-    # Package output stays review-only: human approval and scientific gates
-    # remain mandatory before any execution.
+    # A matching hash is *not* evidence of source authenticity: anyone able
+    # to edit local JSON can fabricate the account and matching hash. The
+    # broker-cost attestation verifier / independently pinned trust root is
+    # NOT provisioned yet. Fail closed even for self-consistent local files.
+    # Revisit only after implementing genuine independent signature/venue
+    # verification; never satisfy this by inventing key material.
     if not valid:
         reasons.append("MT5_EXECUTABLE_BROKER_COST_AND_FILL_AUTHORITY_NOT_PROVISIONED")
+    reasons.append("MT5_BROKER_COST_SOURCE_AUTHENTICITY_NOT_VERIFIED")
     return reasons
 
 def main():

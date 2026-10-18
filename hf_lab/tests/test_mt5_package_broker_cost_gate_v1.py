@@ -75,7 +75,10 @@ def test_bare_flags_not_enough_and_matching_synthetic_export_is_review_only():
     assert "MT5_EXECUTABLE_BROKER_COST_AND_FILL_AUTHORITY_NOT_PROVISIONED" in BLOCKERS(
         connection(),archived(),c,synthetic_export())
     c=linked_cost()
-    assert BLOCKERS(connection(),archived(),c,synthetic_export())==[]
+    reasons=BLOCKERS(connection(),archived(),c,synthetic_export())
+    # Matching user-created SHA256 is integrity, not broker authenticity.
+    assert "MT5_BROKER_COST_SOURCE_AUTHENTICITY_NOT_VERIFIED" in reasons
+    assert reasons == ["MT5_BROKER_COST_SOURCE_AUTHENTICITY_NOT_VERIFIED"]
     # Pure synthetic tests verify data binding only, NOT account authentication.
     assert c["orders_allowed"] is False
 
@@ -117,3 +120,15 @@ def test_package_writer_in_synthetic_state_stays_blocked(tmp_path):
         assert d["auto_promotion_allowed"] is False
     finally:
         main.__globals__["S"]=originals
+
+
+def test_arbitrarily_claimed_external_trust_cannot_bypass_source_authenticity():
+    c=linked_cost()
+    c["independent_source_attestation_verified"]=True
+    c["issuer_key_trusted_and_pinned"]=True
+    x=synthetic_export()
+    x["attested_by"]="SYNTHETIC_FABRICATED_SIGNER"
+    c["source_export_sha256"]=hashlib.sha256(NS["canon"](x).encode()).hexdigest()
+    reasons=BLOCKERS(connection(),archived(),c,x)
+    assert "MT5_BROKER_COST_SOURCE_AUTHENTICITY_NOT_VERIFIED" in reasons
+    assert reasons != []
