@@ -28,8 +28,22 @@ void OnStart()
       return;
    }
 
+   // Never overwrite an earlier observation; do not create a CSV at all
+   // when this is not a named broker server.
+   string server = AccountInfoString(ACCOUNT_SERVER);
+   if(server == "")
+   {
+      Print("OMEGA_STOP: BROKER_SERVER_MISSING");
+      return;
+   }
+   const string export_name = "OMEGA_Mt5ReadOnlyBrokerSpec_v1.csv";
+   if(FileIsExist(export_name))
+   {
+      Print("OMEGA_STOP: EXPORT_ALREADY_EXISTS_NO_OVERWRITE");
+      return;
+   }
    const string names[] = {"EURUSD", "GBPUSD", "USDJPY", "XAUUSD"};
-   int output = FileOpen("OMEGA_Mt5ReadOnlyBrokerSpec_v1.csv",
+   int output = FileOpen(export_name,
                          FILE_WRITE | FILE_CSV | FILE_ANSI, ';');
    if(output == INVALID_HANDLE)
    {
@@ -42,13 +56,6 @@ void OnStart()
              "spread_points", "spread_float", "stops_level",
              "swap_long", "swap_short", "execution_mode",
              "quote_status", "commission_status");
-   string server = AccountInfoString(ACCOUNT_SERVER);
-   if(server == "")
-   {
-      FileClose(output);
-      Print("OMEGA_STOP: BROKER_SERVER_MISSING");
-      return;
-   }
    int rows = 0;
    for(int i = 0; i < ArraySize(names); i++)
    {
@@ -96,5 +103,10 @@ void OnStart()
       rows++;
    }
    FileClose(output);
+   if(rows == 0)
+   {
+      Print("OMEGA_STOP: NO_VALID_QUOTES_HEADER_ONLY_EXPORT_NOT_EVIDENCE");
+      return;
+   }
    Print("OMEGA_READONLY_EXPORT_COMPLETED_BUT_NOT_COST_VERIFIED: rows=", rows);
 }

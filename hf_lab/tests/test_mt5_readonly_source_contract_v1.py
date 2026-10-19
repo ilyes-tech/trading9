@@ -29,6 +29,22 @@ def test_no_executable_order_or_network_api_used():
         assert not re.search(r"\b" + re.escape(item) + r"\b", data)
 
 
+def test_export_never_overwrites_previous_snapshot_and_requires_server_before_fileopen():
+    data = SOURCE.read_text()
+    assert 'EXPORT_ALREADY_EXISTS_NO_OVERWRITE' in data
+    assert 'FileIsExist(export_name)' in data
+    assert data.index('AccountInfoString(ACCOUNT_SERVER)') < data.index('FileOpen(')
+    assert data.index('FileIsExist(export_name)') < data.index('FileOpen(')
+    assert data.index('BROKER_SERVER_MISSING') < data.index('FileOpen(')
+
+
+def test_empty_quote_export_cannot_claim_completion():
+    data = SOURCE.read_text()
+    assert 'if(rows == 0)' in data
+    assert 'NO_VALID_QUOTES_HEADER_ONLY_EXPORT_NOT_EVIDENCE' in data
+    assert data.index('if(rows == 0)') < data.index('OMEGA_READONLY_EXPORT_COMPLETED_BUT_NOT_COST_VERIFIED')
+
+
 def test_export_scope_does_not_claim_commission_or_real_fill():
     data = SOURCE.read_text()
     for market in ('"EURUSD"', '"GBPUSD"', '"USDJPY"', '"XAUUSD"'):
