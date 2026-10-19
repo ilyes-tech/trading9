@@ -45,6 +45,23 @@ def test_empty_quote_export_cannot_claim_completion():
     assert data.index('if(rows == 0)') < data.index('OMEGA_READONLY_EXPORT_COMPLETED_BUT_NOT_COST_VERIFIED')
 
 
+def test_export_rejects_stale_or_future_mt5_quote_and_retains_tick_time():
+    data=SOURCE.read_text()
+    assert 'SymbolInfoTick(symbol, tick)' in data
+    assert 'datetime now_server = TimeTradeServer()' in data
+    assert '(long)now_server - (long)tick.time' in data
+    assert 'tick_server_time' in data
+    assert 'TimeToString(TimeGMT(), TIME_DATE | TIME_SECONDS)' in data
+    assert 'CLIENT-ESTIMATED and not independent NTP proof' in data
+    assert 'quote_age_seconds > 120' in data
+    assert 'quote_age_seconds < -120' in data
+    assert 'STALE_OR_FUTURE_TICK_UNVERIFIED_CLOCK' in data
+    assert data.index('if(!received ||') < data.index('quote_age_seconds = ')
+    assert 'TimeToString(tick.time, TIME_DATE | TIME_SECONDS)' in data
+    assert data.index('STALE_OR_FUTURE_TICK_UNVERIFIED_CLOCK') < data.index('FileWrite(output,\n                TimeToString(TimeGMT()')
+    assert 'not independent NTP proof' in data
+
+
 def test_export_scope_does_not_claim_commission_or_real_fill():
     data = SOURCE.read_text()
     for market in ('"EURUSD"', '"GBPUSD"', '"USDJPY"', '"XAUUSD"'):

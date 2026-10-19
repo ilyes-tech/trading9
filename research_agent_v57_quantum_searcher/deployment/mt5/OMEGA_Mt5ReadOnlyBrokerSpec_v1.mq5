@@ -50,7 +50,7 @@ void OnStart()
       Print("OMEGA_STOP: CANNOT_OPEN_SANDBOX_EXPORT");
       return;
    }
-   FileWrite(output, "observed_utc", "server", "symbol",
+   FileWrite(output, "observed_utc", "tick_server_time", "server", "symbol",
              "bid", "ask", "point", "tick_size", "tick_value",
              "contract_size", "lot_min", "lot_step", "lot_max",
              "spread_points", "spread_float", "stops_level",
@@ -66,11 +66,22 @@ void OnStart()
          continue;
       }
       MqlTick tick;
-      bool fresh = SymbolInfoTick(symbol, tick);
-      // A zero or inverted quote is a missing quote, never a free spread.
-      if(!fresh || tick.bid <= 0.0 || tick.ask < tick.bid)
+      bool received = SymbolInfoTick(symbol, tick);
+      if(!received || tick.bid <= 0.0 || tick.ask < tick.bid)
       {
          Print("OMEGA_SKIP: VALID_BID_ASK_MISSING ", symbol);
+         continue;
+      }
+      // A valid BID/ASK alone is insufficient: cached MT5 quotes can be old.
+      // Tick time and TimeTradeServer use the BROKER SERVER time basis.
+      // TimeTradeServer is CLIENT-ESTIMATED and not independent NTP proof.
+      // TimeGMT is used ONLY for the separately labelled observation time.
+      datetime now_server = TimeTradeServer();
+      long quote_age_seconds = (long)now_server - (long)tick.time;
+      if(now_server <= 0 || tick.time <= 0 ||
+         quote_age_seconds > 120 || quote_age_seconds < -120)
+      {
+         Print("OMEGA_SKIP: STALE_OR_FUTURE_TICK_UNVERIFIED_CLOCK ", symbol);
          continue;
       }
       double point = SymbolInfoDouble(symbol, SYMBOL_POINT);
@@ -82,6 +93,7 @@ void OnStart()
       }
       FileWrite(output,
                 TimeToString(TimeGMT(), TIME_DATE | TIME_SECONDS),
+                TimeToString(tick.time, TIME_DATE | TIME_SECONDS),
                 server, symbol,
                 DoubleToString(tick.bid, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)),
                 DoubleToString(tick.ask, (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS)),
