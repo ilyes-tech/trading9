@@ -24,12 +24,25 @@ def test_bounded_synthetic_vertical_replay_memory_reject_and_idempotency(tmp_pat
     assert result['status'] == 'ENGINEERING_PASS_NOT_SCIENTIFIC_ADMISSION'
     assert result['source'] == 'GENERATED_SYNTHETIC_BARS_ONLY'
     assert result['cycles'] == 3
-    assert result['replay_executions'] == 1
+    assert result['replay_executions'] == 2  # original + one fixed-cost stress
+    assert result['stage04_comparison_executions'] == 1
+    cost = result['stage04_cost_stress']
+    assert cost['decision'] == 'REJECT_SYNTHETIC_COST_FRAGILITY'
+    assert cost['comparison_budget'] == 1
+    assert cost['baseline_trades'] == cost['stressed_trades'] == 83
+    assert cost['path_identical'] and cost['every_trade_worsened']
+    assert cost['baseline_net_r'] > 0 > cost['stressed_net_r']
+    assert cost['baseline_pf_synthetic'] > 1 > cost['stressed_pf_synthetic']
+    assert cost['improvement_claimed'] is False
+    assert cost['scientific_admission'] is False
+    assert cost['orders_allowed'] is False
     assert result['closed_synthetic_trades'] == 83
     assert result['verified_synthetic_shadow_events'] == 83
     assert result['synthetic_shadow_no_broker_adapter'] is True
     assert result['learning_ticks_inserted'] == [1, 0, 0]
     assert result['learned_observations'] == 1
+    assert result['stage04_learning_decision'] == 'REJECT'
+    assert result['stage04_learning_reason'] == 'SYNTHETIC_COST_FRAGILITY_REJECT_NO_SCIENTIFIC_ADMISSION'
     assert result['dedup_replay_skips'] == 2
     assert all(result[key] is False for key in (
         'market_data_accessed', 'production_learning_memory_modified',
@@ -140,3 +153,41 @@ def test_repeated_integrated_synthetic_cycles_produce_same_evidence(tmp_path):
     assert first['learning_ticks_inserted'] == [1, 0, 0]
     assert first['orders_allowed'] is False
     assert first['real_orders_executed'] is False
+
+
+def test_stage04_rejects_modified_trade_path_before_learning(tmp_path,monkeypatch):
+    from dataclasses import replace
+    from datetime import timedelta
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+
+    safe_state(tmp_path)
+    real=cycle.run_replay
+
+    def tampered(*args,**kwargs):
+        out=real(*args,**kwargs)
+        trades=list(out.trades)
+        trades[0]=replace(trades[0],entry_time=trades[0].entry_time+timedelta(minutes=1))
+        return replace(out,trades=tuple(trades))
+
+    monkeypatch.setattr(cycle,'run_replay',tampered)
+    with pytest.raises(RuntimeError,match='STAGE04_REPLAY_PATH_OR_NUMERIC_MISMATCH'):
+        guarded_synthetic_cycle(tmp_path)
+    assert not list(tmp_path.glob('*.sqlite3'))
+
+
+def test_stage04_rejects_false_cost_robustness_or_unexpected_profit(tmp_path,monkeypatch):
+    from dataclasses import replace
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+
+    safe_state(tmp_path)
+    real=cycle.run_replay
+
+    def tampered(*args,**kwargs):
+        out=real(*args,**kwargs)
+        metrics=replace(out.metrics,net_r=3.0,profit_factor=2.0)
+        return replace(out,metrics=metrics)
+
+    monkeypatch.setattr(cycle,'run_replay',tampered)
+    with pytest.raises(RuntimeError,match='STAGE04_COST_FRAGILITY_VETO_NOT_DEMONSTRATED'):
+        guarded_synthetic_cycle(tmp_path)
+    assert not list(tmp_path.glob('*.sqlite3'))

@@ -7,6 +7,9 @@ from __future__ import annotations
 
 import json
 import sqlite3
+import math
+
+from hf_lab.replay import ReplaySettings, run_replay
 from pathlib import Path
 import runpy
 import tempfile
@@ -74,6 +77,60 @@ def inspect_synthetic_shadow(replay_db: Path) -> int:
     return len(ids)
 
 
+def compare_cost_stress(base_db: Path, stress_db: Path, baseline_metrics: dict) -> dict:
+    """One additional *synthetic-only* cost stress. Veto, never optimize fees."""
+    stress=ReplaySettings(fee_bps_per_side=20.0,slippage_bps_per_side=5.0,
+                          shadow_only=True,allow_real_orders=False)
+    report=run_replay(symbol='BTCUSD',dataset='SYNTHETIC_STAGE04_COST_REVIEW_ONLY',
+                      bars=smoke.synthetic_bars(),strategy=smoke.momentum_burst,
+                      settings=stress,database_path=stress_db)
+    with sqlite3.connect(base_db) as db:
+        base=db.execute("SELECT side,signal_time,entry_time,exit_time,net_r "
+                        "FROM trades WHERE result!='OPEN' ORDER BY id").fetchall()
+    stressed=list(report.trades)
+    if len(base)!=83 or len(stressed)!=83:
+        raise RuntimeError('STAGE04_TRADE_COUNT_CHANGED')
+    for initial,modified in zip(base,stressed,strict=True):
+        a_side,a_signal,a_entry,a_exit,a_net=initial
+        # SQLite datetimes are normalized strings by the replay writer.
+        actual=(modified.side,modified.signal_time.isoformat(),
+                modified.entry_time.isoformat(),modified.exit_time.isoformat())
+        expected=(a_side,a_signal,a_entry,a_exit)
+        if actual!=expected or not math.isfinite(a_net) or not math.isfinite(modified.net_r):
+            raise RuntimeError('STAGE04_REPLAY_PATH_OR_NUMERIC_MISMATCH')
+        if modified.net_r>=a_net:
+            raise RuntimeError('STAGE04_HIGHER_COST_DID_NOT_REDUCE_NET_TRADE')
+    base_net=baseline_metrics['net_r']
+    stress_net=report.metrics.net_r
+    base_pf=baseline_metrics['profit_factor']
+    stress_pf=report.metrics.profit_factor
+    if (not all(math.isfinite(x) for x in (base_net,stress_net,base_pf,stress_pf))
+            or not base_net>0 or not stress_net<0 or not base_pf>1 or not 0<=stress_pf<1):
+        raise RuntimeError('STAGE04_COST_FRAGILITY_VETO_NOT_DEMONSTRATED')
+    return {
+        'kind':'OMEGA_STAGE04_SYNTHETIC_COST_STRESS_V1',
+        'status':'CONTROLLED_COMPARISON_REJECT_COST_FRAGILITY',
+        'source':'SYNTHETIC_BARS_ONLY',
+        'comparison_budget':1,
+        'baseline_fee_bps_per_side':5.0,
+        'baseline_slippage_bps_per_side':1.0,
+        'stressed_fee_bps_per_side':20.0,
+        'stressed_slippage_bps_per_side':5.0,
+        'baseline_trades':len(base),
+        'stressed_trades':len(stressed),
+        'baseline_net_r':base_net,
+        'stressed_net_r':stress_net,
+        'baseline_pf_synthetic':base_pf,
+        'stressed_pf_synthetic':stress_pf,
+        'path_identical':True,
+        'every_trade_worsened':True,
+        'decision':'REJECT_SYNTHETIC_COST_FRAGILITY',
+        'improvement_claimed':False,
+        'scientific_admission':False,
+        'orders_allowed':False,'holdout_allowed':False,
+    }
+
+
 def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
     """Run one bounded fictitious replay then three deduplicated memory ticks."""
     if cycles != 3:
@@ -96,12 +153,14 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
 
     with tempfile.TemporaryDirectory(prefix='omega-synth-cycle-') as tmp:
         temp = Path(tmp)
-        fingerprint, trades, signals, _ = smoke.exercise(
-            temp / 'synthetic_replay.sqlite3', smoke.synthetic_bars()
+        baseline_db=temp / 'synthetic_replay.sqlite3'
+        fingerprint, trades, signals, diagnostic = smoke.exercise(
+            baseline_db, smoke.synthetic_bars()
         )
         if (trades, signals) != (83, 83):
             raise RuntimeError('SYNTHETIC_REPLAY_OUTPUT_CHANGED')
-        shadow_events = inspect_synthetic_shadow(temp / 'synthetic_replay.sqlite3')
+        shadow_events = inspect_synthetic_shadow(baseline_db)
+        cost_stress = compare_cost_stress(baseline_db,temp / 'stress_replay.sqlite3',diagnostic)
         evidence = temp / 'evidence'
         evidence.mkdir()
         (evidence / 'synthetic_reject.json').write_text(json.dumps({
@@ -112,7 +171,7 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
             'result': {'batches': [{'candidates': [{
                 'strategy_id': 'SYNTHETIC_NOT_REAL',
                 'decision': 'REJECT',
-                'deep_status': 'NO_INDEPENDENT_MARKET_EVIDENCE',
+                'deep_status': 'SYNTHETIC_COST_FRAGILITY_REJECT_NO_SCIENTIFIC_ADMISSION',
             }]}]},
             'research_execution_authorized': False,
             'orders_allowed': False,
@@ -122,6 +181,10 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
         ticks = [ingest(evidence) for _ in range(cycles)]
         if ticks != [(1, 1), (0, 1), (0, 1)]:
             raise RuntimeError('SYNTHETIC_MEMORY_DEDUP_FAILED')
+        with sqlite3.connect(temp / 'learning.sqlite3') as mem:
+            decisions=mem.execute('SELECT decision, reason FROM observations').fetchall()
+        if decisions!=[('REJECT','SYNTHETIC_COST_FRAGILITY_REJECT_NO_SCIENTIFIC_ADMISSION')]:
+            raise RuntimeError('STAGE04_COST_STRESS_MEMORY_DECISION_MISSING')
     # Verify the external gate has not changed before reporting PASS.
     after = json.loads((state / 'search_authorization_v1.json').read_text())
     if after != auth:
@@ -131,12 +194,16 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
         'status': 'ENGINEERING_PASS_NOT_SCIENTIFIC_ADMISSION',
         'source': 'GENERATED_SYNTHETIC_BARS_ONLY',
         'cycles': cycles,
-        'replay_executions': 1,
+        'replay_executions': 2,
+        'stage04_cost_stress':cost_stress,
+        'stage04_comparison_executions':1,
         'closed_synthetic_trades': trades,
         'verified_synthetic_shadow_events': shadow_events,
         'synthetic_shadow_no_broker_adapter': True,
         'learning_ticks_inserted': [a for a, _ in ticks],
         'learned_observations': ticks[-1][1],
+        'stage04_learning_decision':decisions[0][0],
+        'stage04_learning_reason':decisions[0][1],
         'dedup_replay_skips': cycles - 1,
         'synthetic_replay_fingerprint_sha256': fingerprint,
         'market_data_accessed': False,
