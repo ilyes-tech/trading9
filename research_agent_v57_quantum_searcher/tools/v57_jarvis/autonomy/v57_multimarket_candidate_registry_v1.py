@@ -30,12 +30,22 @@ def build(inventory,proposals,eligibility,agenda,rejected_ids=frozenset()):
             hid=p['hypothesis_id']
             if hid in seen:continue
             seen.add(hid)
-            records.append({'market':symbol,'hypothesis_id':hid,'source_doi':p['source_doi'],'data_schema_supported':supported.get(symbol,False),'duplicate_exhausted_id':hid in exhausted,'duplicate_rejected_strategy_id':hid in rejected_ids,'status':'HISTORICALLY_REJECTED_EXACT_STRATEGY_ID' if hid in rejected_ids else ('HISTORICALLY_EXHAUSTED' if hid in exhausted else 'NOVELTY_AND_CAUSAL_EVIDENCE_UNVERIFIED'),'execution_authorized':False})
+            background=p.get('bibliographic_role')=='PUBLISHER_ABSTRACT_VOLATILITY_CONTEXT_ONLY'
+            status=('HISTORICALLY_REJECTED_EXACT_STRATEGY_ID' if hid in rejected_ids
+                    else 'HISTORICALLY_EXHAUSTED' if hid in exhausted
+                    else 'PUBLISHER_BIBLIOGRAPHY_ONLY_NO_DIRECTIONAL_HYPOTHESIS' if background
+                    else 'NOVELTY_AND_CAUSAL_EVIDENCE_UNVERIFIED')
+            records.append({'market':symbol,'hypothesis_id':hid,'source_doi':p['source_doi'],
+                'data_schema_supported':supported.get(symbol,False),
+                'duplicate_exhausted_id':hid in exhausted,
+                'duplicate_rejected_strategy_id':hid in rejected_ids,
+                'literature_background_only':background,
+                'status':status,'execution_authorized':False})
         if not source_proposals:
-            records.append({'market':symbol,'hypothesis_id':None,'source_doi':None,'data_schema_supported':supported.get(symbol,False),'duplicate_exhausted_id':False,'duplicate_rejected_strategy_id':False,'status':'NO_SOURCE_BACKED_HYPOTHESIS','execution_authorized':False})
+            records.append({'market':symbol,'hypothesis_id':None,'source_doi':None,'data_schema_supported':supported.get(symbol,False),'duplicate_exhausted_id':False,'duplicate_rejected_strategy_id':False,'literature_background_only':False,'status':'NO_SOURCE_BACKED_HYPOTHESIS','execution_authorized':False})
     assert {x['market'] for x in records}=={x['market'] for x in inventory['markets']}
     assert all(not x['execution_authorized'] for x in records)
-    return {'kind':'V57_MULTIMARKET_CANDIDATE_REGISTRY_V1','status':'EVIDENCE_GAP_REVIEW_ONLY','records':records,'markets_covered':7,'source_backed_candidates':sum(x['hypothesis_id'] is not None for x in records),'rejected_strategy_ids_known':sorted(rejected_ids),'rejected_exact_id_proposals':sum(x['duplicate_rejected_strategy_id'] for x in records),'rejection_history_read':True,'novelty_proven':False,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False}
+    return {'kind':'V57_MULTIMARKET_CANDIDATE_REGISTRY_V1','status':'EVIDENCE_GAP_REVIEW_ONLY','records':records,'markets_covered':7,'source_backed_candidates':sum(x['hypothesis_id'] is not None for x in records),'publisher_background_references':sum(x['literature_background_only'] for x in records),'admitted_trading_candidates':0,'rejected_strategy_ids_known':sorted(rejected_ids),'rejected_exact_id_proposals':sum(x['duplicate_rejected_strategy_id'] for x in records),'rejection_history_read':True,'novelty_proven':False,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False}
 
 def main():
     def load(name):return json.loads((S/name).read_text())

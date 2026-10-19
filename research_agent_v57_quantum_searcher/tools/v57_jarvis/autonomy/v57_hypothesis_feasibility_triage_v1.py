@@ -248,9 +248,16 @@ def main():
     first_review_signature=independent_initial_review_status()
     rows=[]
     for p in proposals['proposals']:
-        assert p['market']=='BTCUSD' and p['execution_authorized'] is False
+        assert p['execution_authorized'] is False
         title=p['source_title'].lower()
-        if any(term in title for term in ('liquidation','displayed depth','hidden liquidity','market making','quoting')):
+        if p.get('bibliographic_role')=='PUBLISHER_ABSTRACT_VOLATILITY_CONTEXT_ONLY':
+            assert p['market'] in ('EURUSD','XAUUSD')
+            assert p['causal_dimension']=='VOLATILITY_BACKGROUND_ONLY_NOT_DIRECTIONAL_EDGE'
+            assert p['source_fingerprint_type']=='LOCAL_BIBLIOGRAPHIC_METADATA_NOT_INDEPENDENT_TEXT_ATTESTATION'
+            classification='BACKGROUND_ONLY_INSTRUMENT_TRANSFER_AND_COST_REVIEW_REQUIRED'
+        elif p['market']!='BTCUSD':
+            raise ValueError('UNKNOWN_NONBTC_PROPOSAL_REQUIRES_HUMAN_REVIEW')
+        elif any(term in title for term in ('liquidation','displayed depth','hidden liquidity','market making','quoting')):
             classification=('TARGET_HISTORICAL_COINM_LIQUIDATION_ARCHIVES_VERIFIED_NOT_PROSPECTIVE'
                             if historical_archive_sha256 else
                             'PARTIAL_PUBLIC_FUTURES_BOOK_AVAILABLE_LIQUIDATION_DATA_NOT_VERIFIED'
