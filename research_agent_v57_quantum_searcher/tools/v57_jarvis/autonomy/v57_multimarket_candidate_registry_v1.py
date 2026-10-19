@@ -1,14 +1,26 @@
 """Market-neutral candidate registry; no synthetic novelty or execution admission."""
-import json
+import json,sqlite3
 from pathlib import Path
 S=Path('/home/trading/.local/state/tradingai/jarvis-autonomous')
 
-def build(inventory,proposals,eligibility,agenda):
+def rejected_strategy_ids(db):
+    """Fail closed if the persistent JARVIS rejection history cannot be read."""
+    if db.is_symlink() or not db.is_file():
+        raise ValueError('REJECTION_HISTORY_UNAVAILABLE')
+    with sqlite3.connect(f'file:{db}?mode=ro',uri=True,timeout=3) as conn:
+        conn.execute('PRAGMA query_only=ON')
+        rows=conn.execute('SELECT DISTINCT strategy_id FROM observations WHERE decision IN (?,?) AND strategy_id IS NOT NULL',('REJECT','REJECTED_DEEP')).fetchall()
+    if any(not isinstance(x[0],str) or not x[0] or len(x[0])>512 for x in rows):
+        raise ValueError('REJECTION_HISTORY_INVALID_ID')
+    return frozenset(x[0] for x in rows)
+
+def build(inventory,proposals,eligibility,agenda,rejected_ids=frozenset()):
     assert inventory['kind']=='V57_MULTIMARKET_CAPABILITY_INVENTORY_V1'
     assert eligibility['kind']=='V57_MULTIMARKET_FEATURE_ELIGIBILITY_V1'
     assert agenda['kind']=='JARVIS_RESEARCH_AGENDA_V4'
     assert agenda['active'] is None
     exhausted={x['id'] for x in agenda['items'] if x['status']=='EXHAUSTED'}
+    rejected_ids=frozenset(rejected_ids)
     supported={x['market']:x['bar_imbalance_feature_schema_supported'] for x in eligibility['markets']}
     records=[]; seen=set()
     for market in inventory['markets']:
@@ -18,16 +30,16 @@ def build(inventory,proposals,eligibility,agenda):
             hid=p['hypothesis_id']
             if hid in seen:continue
             seen.add(hid)
-            records.append({'market':symbol,'hypothesis_id':hid,'source_doi':p['source_doi'],'data_schema_supported':supported.get(symbol,False),'duplicate_exhausted_id':hid in exhausted,'status':'HISTORICALLY_EXHAUSTED' if hid in exhausted else 'NOVELTY_AND_CAUSAL_EVIDENCE_UNVERIFIED','execution_authorized':False})
+            records.append({'market':symbol,'hypothesis_id':hid,'source_doi':p['source_doi'],'data_schema_supported':supported.get(symbol,False),'duplicate_exhausted_id':hid in exhausted,'duplicate_rejected_strategy_id':hid in rejected_ids,'status':'HISTORICALLY_REJECTED_EXACT_STRATEGY_ID' if hid in rejected_ids else ('HISTORICALLY_EXHAUSTED' if hid in exhausted else 'NOVELTY_AND_CAUSAL_EVIDENCE_UNVERIFIED'),'execution_authorized':False})
         if not source_proposals:
-            records.append({'market':symbol,'hypothesis_id':None,'source_doi':None,'data_schema_supported':supported.get(symbol,False),'duplicate_exhausted_id':False,'status':'NO_SOURCE_BACKED_HYPOTHESIS','execution_authorized':False})
+            records.append({'market':symbol,'hypothesis_id':None,'source_doi':None,'data_schema_supported':supported.get(symbol,False),'duplicate_exhausted_id':False,'duplicate_rejected_strategy_id':False,'status':'NO_SOURCE_BACKED_HYPOTHESIS','execution_authorized':False})
     assert {x['market'] for x in records}=={x['market'] for x in inventory['markets']}
     assert all(not x['execution_authorized'] for x in records)
-    return {'kind':'V57_MULTIMARKET_CANDIDATE_REGISTRY_V1','status':'EVIDENCE_GAP_REVIEW_ONLY','records':records,'markets_covered':7,'source_backed_candidates':sum(x['hypothesis_id'] is not None for x in records),'novelty_proven':False,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False}
+    return {'kind':'V57_MULTIMARKET_CANDIDATE_REGISTRY_V1','status':'EVIDENCE_GAP_REVIEW_ONLY','records':records,'markets_covered':7,'source_backed_candidates':sum(x['hypothesis_id'] is not None for x in records),'rejected_strategy_ids_known':sorted(rejected_ids),'rejected_exact_id_proposals':sum(x['duplicate_rejected_strategy_id'] for x in records),'rejection_history_read':True,'novelty_proven':False,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False}
 
 def main():
     def load(name):return json.loads((S/name).read_text())
-    doc=build(load('multimarket_capability_inventory_v1.json'),load('evidence_hypothesis_proposals_v1.json'),load('multimarket_feature_eligibility_v1.json'),load('research_agenda_v4.json'))
+    doc=build(load('multimarket_capability_inventory_v1.json'),load('evidence_hypothesis_proposals_v1.json'),load('multimarket_feature_eligibility_v1.json'),load('research_agenda_v4.json'),rejected_strategy_ids(S/'learning_memory_v2.sqlite3'))
     out=S/'multimarket_candidate_registry_v1.json';tmp=out.with_suffix('.tmp')
     tmp.write_text(json.dumps(doc,indent=2,sort_keys=True)+'\n');tmp.replace(out)
     print('ALL PASS|MULTIMARKET_CANDIDATE_REGISTRY|MARKETS=7|SOURCED='+str(doc['source_backed_candidates'])+'|NOVELTY=UNVERIFIED|EXECUTION=DENIED')

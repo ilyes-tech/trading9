@@ -29,9 +29,14 @@ def build(registry,questions,history,resolution=None):
                   and type(trial_count) is int and trial_count > 0
                   and resolution.get('historical_trials_in_registry') == trial_count
                   and all(resolution.get(k) is False for k in ('research_execution_authorized','orders_allowed','mt5_allowed','holdout_allowed')))
+        exact_memory_reject=(q.get('hypothesis_id') is not None and
+            any(r.get('duplicate_rejected_strategy_id') is True and
+                r['hypothesis_id']==q['hypothesis_id'] for r in records))
         if closed:
             next_step = 'STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS'
-        rows.append({'market':symbol,'question_status':q['status'],'source_backed_candidate_count':sum(r['hypothesis_id'] is not None for r in records),'exhausted_history_count':bymarket[symbol]['historical_exhausted_count'],'historical_rejection_known':bool(bymarket[symbol]['historical_exhausted_count']),'out_of_sample_performance':None,'independent_replication':None,'causal_novelty_verified':False,'historical_trial_count':trial_count,'historical_sixty_second_trial_count':h.get('historical_sixty_second_trial_count'),'historical_trial_scope':h.get('historical_trial_scope','HISTORY_UNAVAILABLE_OR_INVALID'),'scientific_review_status':'REJECTED_EXISTING_FAMILY' if closed else 'UNRESOLVED','reviewed_hypothesis_id':q.get('hypothesis_id') if closed else None,'next_step':next_step,'research_authorized':False,'execution_authorized':False})
+        if exact_memory_reject:
+            next_step = 'STOP_REJECTED_EXACT_STRATEGY_ID_FROM_MEMORY'
+        rows.append({'market':symbol,'question_status':q['status'],'source_backed_candidate_count':sum(r['hypothesis_id'] is not None for r in records),'exhausted_history_count':bymarket[symbol]['historical_exhausted_count'],'historical_rejection_known':bool(bymarket[symbol]['historical_exhausted_count'] or exact_memory_reject),'exact_strategy_memory_reject':bool(exact_memory_reject),'out_of_sample_performance':None,'independent_replication':None,'causal_novelty_verified':False,'historical_trial_count':trial_count,'historical_sixty_second_trial_count':h.get('historical_sixty_second_trial_count'),'historical_trial_scope':h.get('historical_trial_scope','HISTORY_UNAVAILABLE_OR_INVALID'),'scientific_review_status':'REJECTED_EXACT_STRATEGY_ID_FROM_MEMORY' if exact_memory_reject else ('REJECTED_EXISTING_FAMILY' if closed else 'UNRESOLVED'),'reviewed_hypothesis_id':q.get('hypothesis_id') if (closed or exact_memory_reject) else None,'next_step':next_step,'research_authorized':False,'execution_authorized':False})
     assert len(rows)==7 and len({x['market'] for x in rows})==7
     return {'kind':'V57_MULTIMARKET_RESEARCH_FEEDBACK_V1','status':'NO_VERIFIED_NEW_EXPERIMENTAL_FEEDBACK','markets':rows,'scores_fabricated':False,'execution_authorized':False,'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False}
 

@@ -17,7 +17,9 @@ def decide(inventory,queue,features,history,registry,feedback):
     rows=[]
     for market in MARKETS:
         q=by_queue[market];f=by_feature[market];h=by_history[market];fb=by_feedback[market]
-        if fb.get('scientific_review_status') == 'REJECTED_EXISTING_FAMILY' and fb.get('next_step') == 'STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS':
+        if fb.get('exact_strategy_memory_reject') is True and fb.get('next_step')=='STOP_REJECTED_EXACT_STRATEGY_ID_FROM_MEMORY':
+            next_action='STOP_REJECTED_EXACT_STRATEGY_ID_FROM_MEMORY'
+        elif fb.get('scientific_review_status') == 'REJECTED_EXISTING_FAMILY' and fb.get('next_step') == 'STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS':
             next_action='STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS'
         elif not q['bar_data_present']:next_action='ACQUIRE_AND_VERIFY_MARKET_DATA'
         elif not f['bar_imbalance_feature_schema_supported']:next_action='VERIFY_REQUIRED_FEATURE_SCHEMA'
