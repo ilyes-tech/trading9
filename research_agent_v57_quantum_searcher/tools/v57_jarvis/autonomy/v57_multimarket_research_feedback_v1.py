@@ -32,6 +32,12 @@ def build(registry,questions,history,resolution=None):
         exact_memory_reject=(q.get('hypothesis_id') is not None and
             any(r.get('duplicate_rejected_strategy_id') is True and
                 r['hypothesis_id']==q['hypothesis_id'] for r in records))
+        if (symbol=='XAUUSD'
+                and q.get('status')=='VOLATILITY_QUESTION_FOR_EXTERNAL_REVIEW_NOT_ADMITTED'
+                and q.get('source_role')=='PUBLISHER_BACKGROUND_ONLY_NOT_TRADABLE_ALPHA'
+                and q.get('costs_verified') is False
+                and q.get('directional_edge_proven') is False):
+            next_step='REVIEW_XAU_VOLATILITY_PROTOCOL_INSTRUMENT_TRANSFER_AND_COSTS'
         if closed:
             next_step = 'STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS'
         if exact_memory_reject:

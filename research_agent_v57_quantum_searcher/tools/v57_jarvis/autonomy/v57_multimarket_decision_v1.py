@@ -22,6 +22,11 @@ def decide(inventory,queue,features,history,registry,feedback):
         elif fb.get('scientific_review_status') == 'REJECTED_EXISTING_FAMILY' and fb.get('next_step') == 'STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS':
             next_action='STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS'
         elif not q['bar_data_present']:next_action='ACQUIRE_AND_VERIFY_MARKET_DATA'
+        elif (market=='XAUUSD'
+              and f.get('price_bar_march_schema_supported') is True
+              and fb.get('question_status')=='VOLATILITY_QUESTION_FOR_EXTERNAL_REVIEW_NOT_ADMITTED'
+              and fb.get('next_step')=='REVIEW_XAU_VOLATILITY_PROTOCOL_INSTRUMENT_TRANSFER_AND_COSTS'):
+            next_action='REVIEW_XAU_VOLATILITY_PROTOCOL_INSTRUMENT_TRANSFER_AND_COSTS'
         elif not f['bar_imbalance_feature_schema_supported'] and f.get('price_bar_march_schema_supported') is True:
             next_action='REVIEW_PRICE_BAR_HYPOTHESIS_AND_EXECUTABLE_BROKER_COSTS'
         elif not f['bar_imbalance_feature_schema_supported']:next_action='VERIFY_REQUIRED_FEATURE_SCHEMA'
