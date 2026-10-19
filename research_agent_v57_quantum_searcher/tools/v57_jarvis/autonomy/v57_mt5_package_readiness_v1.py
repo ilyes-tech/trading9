@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Read-only MT5 packaging readiness gate. No package generation or execution."""
-import hashlib,json,sys,time
+import hashlib,json,sys,time,os,stat,subprocess,tempfile
 from pathlib import Path
 S=Path("/home/trading/.local/state/tradingai/jarvis-autonomous")
 R=Path("/home/trading/TradingAI-HF-Lab/research_agent_v57_quantum_searcher")
@@ -8,7 +8,71 @@ def load(p):
  if p.is_symlink() or not p.is_file():return None
  return json.loads(p.read_text())
 def canon(v):return json.dumps(v,sort_keys=True,separators=(",",":"))
-def broker_cost_blockers(connection, archived_spread, cost_binding, source_export):
+# An externally provisioned, ROOT-owned trust anchor; never generate it
+# inside the project. A signature can certify a review packet's integrity
+# and reviewer identity but does not independently prove broker fills.
+BROKER_COST_REVIEW_TRUST_KEY=Path('/etc/tradingai/omega-mt5-broker-cost-pubkey.pem')
+
+
+def _small_regular_bytes(path, limit, require_root_protected=False):
+    fd=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+    try:
+        info=os.fstat(fd)
+        if (not stat.S_ISREG(info.st_mode) or info.st_size>limit
+                or (require_root_protected and
+                    (info.st_uid!=0 or info.st_mode & 0o022))):
+            raise ValueError('UNTRUSTED_OR_OVERSIZED_ATTESTATION_FILE')
+        data=os.read(fd,limit+1)
+        if len(data)>limit or len(data)!=info.st_size:
+            raise ValueError('INVALID_ATTESTATION_FILE_SIZE')
+        return data
+    finally:
+        os.close(fd)
+
+
+def signed_broker_cost_review_valid(cost_path, signature_path, trust_key_path, expected_cost=None):
+    """Only a preprovisioned trusted Ed25519 signer can attest cost packet.
+
+    The detached signature covers EXACT bytes of the broker cost binding JSON
+    whose export hash, account/server match and fee component claims are
+    checked separately. Trust-key creation must be external to JARVIS.
+    This grants review eligibility prerequisite only, NEVER trading access.
+    """
+    try:
+        raw=_small_regular_bytes(cost_path,65536)
+        detached=_small_regular_bytes(signature_path,256)
+        trusted=_small_regular_bytes(trust_key_path,8192,require_root_protected=True)
+        if len(detached)!=64 or not trusted.startswith(b'-----BEGIN PUBLIC KEY-----'):
+            return False
+        body=json.loads(raw)
+        if not isinstance(body,dict) or (expected_cost is not None and body!=expected_cost):
+            return False
+        # Verify the immutable byte snapshots, not mutable original paths.
+        # Otherwise the JSON could be swapped after comparison to expected_cost.
+        with tempfile.TemporaryDirectory(prefix='omega_broker_review_') as temp:
+            private=Path(temp)
+            source=private/'cost.json'
+            sig=private/'cost.sig'
+            key=private/'review_pubkey.pem'
+            source.write_bytes(raw)
+            sig.write_bytes(detached)
+            key.write_bytes(trusted)
+            os.chmod(key,0o600)
+            pub=subprocess.run(['openssl','pkey','-pubin','-in',str(key),
+                                '-text','-noout'],capture_output=True,text=True,timeout=8)
+            if pub.returncode!=0 or 'ED25519 Public-Key:' not in pub.stdout:
+                return False
+            verified=subprocess.run(['openssl','pkeyutl','-verify','-pubin',
+                                     '-inkey',str(key),'-sigfile',str(sig),
+                                     '-rawin','-in',str(source)],
+                                    capture_output=True,timeout=8)
+            return verified.returncode==0
+    except (OSError,ValueError,TypeError,subprocess.SubprocessError,
+            json.JSONDecodeError):
+        return False
+
+
+def broker_cost_blockers(connection, archived_spread, cost_binding, source_export, source_authenticity_verified=False):
     """Separate broker-account execution evidence from old historical MT5 spreads.
 
     This adds a packaging-REVIEW prerequisite; it cannot authorize orders.
@@ -51,21 +115,24 @@ def broker_cost_blockers(connection, archived_spread, cost_binding, source_expor
         and source_export.get("server")==connection["server"]
         and source_export.get("account_ref_hash")==connection["account_ref_hash"]
         and cost_binding.get("source_export_sha256")==hashlib.sha256(canon(source_export).encode()).hexdigest())
-    # A matching hash is *not* evidence of source authenticity: anyone able
-    # to edit local JSON can fabricate the account and matching hash. The
-    # broker-cost attestation verifier / independently pinned trust root is
-    # NOT provisioned yet. Fail closed even for self-consistent local files.
-    # Revisit only after implementing genuine independent signature/venue
-    # verification; never satisfy this by inventing key material.
+    # A matching hash is *not* evidence of source authenticity. The source
+    # binding may be accepted for REVIEW only after verifying a DETACHED
+    # Ed25519 signature under the independently controlled trust key.
     if not valid:
         reasons.append("MT5_EXECUTABLE_BROKER_COST_AND_FILL_AUTHORITY_NOT_PROVISIONED")
-    reasons.append("MT5_BROKER_COST_SOURCE_AUTHENTICITY_NOT_VERIFIED")
+    if not (valid and source_authenticity_verified is True):
+        reasons.append("MT5_BROKER_COST_SOURCE_AUTHENTICITY_NOT_VERIFIED")
     return reasons
 
 def main():
  d=load(S/"phase2_deep_validation_v1.json")
  result=load(S/"phase2_scientific_result_v1.json")
- reasons=broker_cost_blockers(load(S/"stage03_mt5_demo_connection_readonly_precheck_v1.json"),load(S/"stage03_mt5_march_development_spread_preflight_v1.json"),load(S/"stage03_mt5_broker_cost_input_binding_v1.json"),load(S/"stage03_mt5_readonly_account_cost_export_v1.json"))
+ costs=load(S/"stage03_mt5_broker_cost_input_binding_v1.json")
+ signature_verified=signed_broker_cost_review_valid(
+  S/"stage03_mt5_broker_cost_input_binding_v1.json",
+  S/"stage03_mt5_broker_cost_input_binding_v1.sig",
+  BROKER_COST_REVIEW_TRUST_KEY,costs)
+ reasons=broker_cost_blockers(load(S/"stage03_mt5_demo_connection_readonly_precheck_v1.json"),load(S/"stage03_mt5_march_development_spread_preflight_v1.json"),costs,load(S/"stage03_mt5_readonly_account_cost_export_v1.json"),source_authenticity_verified=signature_verified)
  sid=d.get("strategy_id") if d else None
  if not d or d.get("status")!="COMPLETED" or (d.get("deep") or {}).get("status")!="DEEP_PASS" or d.get("independent_replay_exact_pass") is not True:reasons.append("DEEP_PASS_MISSING")
  if not result or not d or result.get("execution_token")!=d.get("execution_token"):reasons.append("SCIENTIFIC_BINDING_MISSING")

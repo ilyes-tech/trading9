@@ -1,6 +1,8 @@
 """Synthetic safety tests: MT5 packaging must not trust archived demo spreads."""
 import json
 import hashlib
+import os
+import subprocess
 from pathlib import Path
 import runpy
 
@@ -132,3 +134,80 @@ def test_arbitrarily_claimed_external_trust_cannot_bypass_source_authenticity():
     reasons=BLOCKERS(connection(),archived(),c,x)
     assert "MT5_BROKER_COST_SOURCE_AUTHENTICITY_NOT_VERIFIED" in reasons
     assert reasons != []
+
+
+def _synthetic_signed_review(tmp_path, data=None):
+    """Ephemeral synthetic signer in pytest temp ONLY, never provision VPS trust."""
+    private=tmp_path/"testing_private_key.pem"
+    public=tmp_path/"testing_public_key.pem"
+    evidence=tmp_path/"mock_costs.json"
+    signature=tmp_path/"mock_costs.sig"
+    packet=linked_cost() if data is None else data
+    evidence.write_text(json.dumps(packet,sort_keys=True,indent=2)+"\n")
+    subprocess.run(["openssl","genpkey","-algorithm","Ed25519","-out",str(private)],
+                   check=True,capture_output=True)
+    subprocess.run(["openssl","pkey","-in",str(private),"-pubout","-out",str(public)],
+                   check=True,capture_output=True)
+    subprocess.run(["openssl","pkeyutl","-sign","-rawin","-inkey",str(private),
+                    "-in",str(evidence),"-out",str(signature)],
+                   check=True,capture_output=True)
+    private.unlink()
+    return evidence,signature,public
+
+
+def test_actual_ed25519_review_signature_validates_synthetic_cost_contract(tmp_path):
+    evidence,signature,public=_synthetic_signed_review(tmp_path)
+    verify=NS["signed_broker_cost_review_valid"]
+    assert verify(evidence,signature,public,linked_cost()) is True
+    assert BLOCKERS(connection(),archived(),linked_cost(),synthetic_export(),True)==[]
+    assert BLOCKERS(connection(),archived(),linked_cost(),synthetic_export(),False)==[
+        "MT5_BROKER_COST_SOURCE_AUTHENTICITY_NOT_VERIFIED"]
+    assert BLOCKERS(connection(),archived(),linked_cost(),synthetic_export(),1)==[
+        "MT5_BROKER_COST_SOURCE_AUTHENTICITY_NOT_VERIFIED"]
+
+
+def test_signed_packet_tampering_missing_key_and_wrong_identity_fail_closed(tmp_path):
+    evidence,signature,public=_synthetic_signed_review(tmp_path)
+    verify=NS["signed_broker_cost_review_valid"]
+    assert verify(evidence,signature,public,dict(linked_cost(),server="forged")) is False
+    evidence.write_bytes(evidence.read_bytes()+b" ")
+    assert verify(evidence,signature,public,linked_cost()) is False
+    evidence.unlink()
+    assert verify(evidence,signature,public,linked_cost()) is False
+    assert verify(evidence,signature,tmp_path/"never_configured.pem",linked_cost()) is False
+
+
+def test_external_trust_root_permissions_and_symlinks_must_be_safe(tmp_path):
+    evidence,signature,public=_synthetic_signed_review(tmp_path)
+    verify=NS["signed_broker_cost_review_valid"]
+    assert verify(evidence,signature,public,linked_cost()) is True
+    os.chmod(public,0o666)
+    assert verify(evidence,signature,public,linked_cost()) is False
+    os.chmod(public,0o644)
+    link=tmp_path/"key_symlink.pem"
+    link.symlink_to(public)
+    assert verify(evidence,signature,link,linked_cost()) is False
+    evidence_link=tmp_path/"json_symlink.json"
+    evidence_link.symlink_to(evidence)
+    assert verify(evidence_link,signature,public,linked_cost()) is False
+    sig_link=tmp_path/"sig_symlink.sig"
+    sig_link.symlink_to(signature)
+    assert verify(evidence,sig_link,public,linked_cost()) is False
+
+
+def test_valid_signature_cannot_override_account_mismatch_or_fake_historical_source(tmp_path):
+    evidence,signature,public=_synthetic_signed_review(tmp_path)
+    assert NS["signed_broker_cost_review_valid"](evidence,signature,public,linked_cost()) is True
+    wrong_account=connection()
+    wrong_account["account_ref_hash"]="b"*64
+    assert "MT5_EXECUTABLE_BROKER_COST_AND_FILL_AUTHORITY_NOT_PROVISIONED" in BLOCKERS(
+        wrong_account,archived(),linked_cost(),synthetic_export(),True)
+    bogus=archived()
+    bogus["holdout_read"]=True
+    assert "ARCHIVED_SPREAD_PROVENANCE_UNVERIFIED" in BLOCKERS(
+        connection(),bogus,linked_cost(),synthetic_export(),True)
+
+
+def test_real_cost_trust_anchor_is_not_provisioned():
+    """Never create or install a trusted key in production from a test fixture."""
+    assert NS["BROKER_COST_REVIEW_TRUST_KEY"].is_file() is False
