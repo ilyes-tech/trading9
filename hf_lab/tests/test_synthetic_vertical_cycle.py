@@ -46,6 +46,19 @@ def test_bounded_synthetic_vertical_replay_memory_reject_and_idempotency(tmp_pat
     assert result['learned_observations'] == 1
     assert result['stage04_learning_decision'] == 'REJECT'
     assert result['stage04_learning_reason'] == 'SYNTHETIC_COST_FRAGILITY_REJECT_NO_SCIENTIFIC_ADMISSION'
+    clock=result['stage07_cross_market_timing']
+    assert clock['status']=='MULTIMARKET_ENGINEERING_CAUSAL_CLOCK_PASS'
+    assert clock['valid_past_only_decisions']==6
+    assert clock['retrospective_label_coverage']==2
+    assert clock['decisions_without_future_labels']==4
+    assert clock['past_decision_survives_future_gap'] is True
+    assert clock['past_probe_survives_future_price_mutation'] is True
+    assert clock['btc_closed_bar_direction']==1
+    assert clock['eth_own_lag_direction']==-1
+    assert clock['earliest_entry_after_decision_seconds']==60
+    assert clock['performance_test_executed'] is False
+    assert clock['historical_market_data_read'] is False
+    assert clock['scientific_admission'] is False
     assert result['dedup_replay_skips'] == 2
     assert all(result[key] is False for key in (
         'market_data_accessed', 'production_learning_memory_modified',
@@ -271,3 +284,53 @@ def test_stage06_rejects_falsified_stressed_sqlite_trades_before_memory(
     with pytest.raises(RuntimeError,match=reason):
         guarded_synthetic_cycle(tmp_path)
     assert not list(tmp_path.glob('*.sqlite3'))
+
+
+def test_stage07_fabricated_future_label_can_never_be_live_eligibility(tmp_path,monkeypatch):
+    from dataclasses import replace
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    safe_state(tmp_path)
+    labels=cycle.aligned_four_minute_pairs
+    clocks=cycle.causal_signal_clocks
+
+    def fabricated(*args,**kwargs):
+        original=labels(*args,**kwargs)
+        if len(original)==2:
+            first=clocks(*args,**kwargs)[0]
+            return (replace(original[0],decision_time=first.decision_time),*original[1:])
+        return original
+
+    monkeypatch.setattr(cycle,'aligned_four_minute_pairs',fabricated)
+    with pytest.raises(RuntimeError,match='STAGE07_FUTURE_LABEL_LEAKAGE_OR_CLOCK_MISMATCH'):
+        guarded_synthetic_cycle(tmp_path)
+
+
+def test_stage07_future_prices_must_not_change_past_probe(tmp_path,monkeypatch):
+    from dataclasses import replace
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    safe_state(tmp_path)
+    probe=cycle.review_only_closed_bar_directions
+
+    def leaky(clock,btc,eth):
+        output=probe(clock,btc,eth)
+        if len(btc)>2:
+            return replace(output,btc_direction=-output.btc_direction)
+        return output
+
+    monkeypatch.setattr(cycle,'review_only_closed_bar_directions',leaky)
+    with pytest.raises(RuntimeError,match='STAGE07_FUTURE_PRICE_OR_LABEL_LEAKAGE'):
+        guarded_synthetic_cycle(tmp_path)
+
+
+def test_stage07_missing_first_past_clock_fails_closed(tmp_path,monkeypatch):
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    safe_state(tmp_path)
+    original=cycle.causal_signal_clocks
+    def missing_first(*args,**kwargs):
+        clocks=original(*args,**kwargs)
+        if len(args[0])==2:return ()
+        return clocks
+
+    monkeypatch.setattr(cycle,'causal_signal_clocks',missing_first)
+    with pytest.raises(RuntimeError,match='STAGE07_FUTURE_LABEL_LEAKAGE_OR_CLOCK_MISMATCH'):
+        guarded_synthetic_cycle(tmp_path)

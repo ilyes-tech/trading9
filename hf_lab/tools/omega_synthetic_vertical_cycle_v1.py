@@ -8,7 +8,13 @@ from __future__ import annotations
 import json
 import sqlite3
 import math
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+from dataclasses import replace
+
+from hf_lab.cross_market_clock import (
+    causal_signal_clocks, aligned_four_minute_pairs, review_only_closed_bar_directions,
+)
+from hf_lab.replay import Bar
 
 from hf_lab.replay import ReplaySettings, run_replay
 from pathlib import Path
@@ -186,6 +192,65 @@ def compare_cost_stress(base_db: Path, stress_db: Path, baseline_metrics: dict) 
     }
 
 
+def inspect_synthetic_cross_market_timing() -> dict:
+    """07E engineering only: preserve decisions when FUTURE labels are unavailable."""
+    origin=datetime(2026,1,1,tzinfo=timezone.utc)
+    def make_bars(closes,excluded=()):
+        return tuple(
+            Bar(time=origin+timedelta(minutes=i),
+                open=100.0,high=max(100.0,value)+1.0,
+                low=min(100.0,value)-1.0,close=float(value))
+            for i,value in enumerate(closes) if i not in excluded
+        )
+    btc=make_bars((100,101,102,99,98,103,105,104,106))
+    eth=make_bars((100,99,98,101,102,97,96,95,94),excluded=(3,))
+    original=causal_signal_clocks(btc[:2],eth[:2])
+    full=causal_signal_clocks(btc,eth)
+    labels=aligned_four_minute_pairs(btc,eth)
+    if (len(original)!=1 or len(full)!=6 or len(labels)!=2
+            or full[0]!=original[0]
+            or full[0].decision_time in {row.decision_time for row in labels}):
+        raise RuntimeError('STAGE07_FUTURE_LABEL_LEAKAGE_OR_CLOCK_MISMATCH')
+    first=review_only_closed_bar_directions(original[0],btc[:2],eth[:2])
+    if (first.btc_direction!=1 or first.eth_self_control_direction!=-1
+            or first.earliest_proxy_entry_time!=origin+timedelta(minutes=3)):
+        raise RuntimeError('STAGE07_CROSS_MARKET_SIGNAL_CAUSALITY_INVALID')
+    # Modify only prices after decision and after close. Past signal is immutable.
+    changed_btc=tuple(replace(bar,close=9999.0,high=10000.0)
+                      if i>=2 else bar for i,bar in enumerate(btc))
+    changed_eth=tuple(replace(bar,close=9999.0,high=10000.0)
+                      if bar.time>=origin+timedelta(minutes=2) else bar for bar in eth)
+    changed_clocks=causal_signal_clocks(changed_btc,changed_eth)
+    if (changed_clocks!=full
+            or review_only_closed_bar_directions(
+                full[0],changed_btc,changed_eth)!=first):
+        raise RuntimeError('STAGE07_FUTURE_PRICE_OR_LABEL_LEAKAGE')
+    # Timestamp holes on ETH must not discard the earlier decision.
+    sparse=eth[:2]
+    if (causal_signal_clocks(btc,sparse)!=(original[0],)
+            or aligned_four_minute_pairs(btc,sparse)):
+        raise RuntimeError('STAGE07_HISTORICAL_LABEL_AS_LIVE_FILTER')
+    return {
+        'kind':'OMEGA_STAGE07_SYNTHETIC_BTC_ETH_CAUSAL_TIMING_V1',
+        'status':'MULTIMARKET_ENGINEERING_CAUSAL_CLOCK_PASS',
+        'data':'GENERATED_BTC_ETH_BARS_ONLY',
+        'candidate_budget':0,
+        'valid_past_only_decisions':len(full),
+        'retrospective_label_coverage':len(labels),
+        'decisions_without_future_labels':len(full)-len(labels),
+        'past_decision_survives_future_gap':True,
+        'past_probe_survives_future_price_mutation':True,
+        'btc_closed_bar_direction':first.btc_direction,
+        'eth_own_lag_direction':first.eth_self_control_direction,
+        'earliest_entry_after_decision_seconds':60,
+        'performance_test_executed':False,
+        'historical_market_data_read':False,
+        'scientific_admission':False,
+        'holdout_read':False,
+        'orders_allowed':False,
+    }
+
+
 def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
     """Run one bounded fictitious replay then three deduplicated memory ticks."""
     if cycles != 3:
@@ -219,6 +284,7 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
             raise RuntimeError('SYNTHETIC_REPLAY_OUTPUT_CHANGED')
         shadow_events = inspect_synthetic_shadow(baseline_db)
         cost_stress = compare_cost_stress(baseline_db,temp / 'stress_replay.sqlite3',diagnostic)
+        cross_market = inspect_synthetic_cross_market_timing()
         evidence = temp / 'evidence'
         evidence.mkdir()
         (evidence / 'synthetic_reject.json').write_text(json.dumps({
@@ -263,6 +329,7 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
         'replay_executions': 2,
         'stage04_cost_stress':cost_stress,
         'stage04_comparison_executions':1,
+        'stage07_cross_market_timing':cross_market,
         'closed_synthetic_trades': trades,
         'verified_synthetic_shadow_events': shadow_events,
         'synthetic_shadow_no_broker_adapter': True,
