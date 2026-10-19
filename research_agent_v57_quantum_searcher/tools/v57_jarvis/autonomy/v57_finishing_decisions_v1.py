@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Fail-closed, read-only finishing decisions; never authorizes MT5."""
-import json, hashlib, sys, time
+import json, hashlib, sys, time, runpy
 from pathlib import Path
 S = Path("/home/trading/.local/state/tradingai/jarvis-autonomous")
 def read(name):
@@ -8,6 +8,43 @@ def read(name):
     if not p.is_file() or p.is_symlink():
         raise RuntimeError("MISSING_OR_SYMLINK:" + name)
     return json.loads(p.read_text())
+def archived_survivor_decision():
+    """Reuse existing forensic tool: a frozen engineering pass is not deployment."""
+    existing=Path(__file__).resolve().parent.parent/'registry/v57_strategy_forensics_v2.py'
+    if not existing.is_file() or existing.is_symlink():
+        raise RuntimeError('ARCHIVED_SURVIVOR_FORENSICS_MISSING')
+    result=runpy.run_path(str(existing))['inspect']()
+    post=result.get('post_calibration_performance_replay') or {}
+    if (result.get('status')!='COMPLETED'
+            or result.get('same_strategy_id') is not True
+            or result.get('provenance_all_pass') is not True
+            or result.get('full_development_calibration',{}).get('proven') is not True
+            or post.get('evidence_found') is not True
+            or post.get('evidence_valid') is not True
+            or post.get('scope')!='DEVELOPMENT_FOLDS_ONLY'
+            or result.get('orders_allowed') is not False
+            or result.get('mt5_launch_allowed') is not False
+            or result.get('holdout_read') is not False):
+        raise RuntimeError('ARCHIVED_SURVIVOR_EVIDENCE_NOT_VERIFIED')
+    sid=result.get('strategy_id')
+    if not isinstance(sid,str) or len(sid)!=64:
+        raise RuntimeError('ARCHIVED_SURVIVOR_ID_INVALID')
+    conclusion=post.get('conclusion')
+    if conclusion=='POST_CALIBRATION_REPLAY_FAIL':
+        decision='REJECT_POST_CALIBRATION_REPLAY'
+    elif conclusion=='POST_CALIBRATION_REPLAY_PASS':
+        decision='EXTERNAL_SCIENTIFIC_REVIEW_REQUIRED_NOT_AUTHORIZED'
+    else:
+        raise RuntimeError('ARCHIVED_SURVIVOR_POSTCAL_VERDICT_UNKNOWN')
+    return {'strategy_id':sid,'decision':decision,
+            'engineering_reference_only':True,'scientific_admission':False,
+            'initial_technical_deep_pass':True,
+            'post_calibration_conclusion':conclusion,
+            'post_calibration_evidence_sha256':post['sha256'],
+            'post_calibration_fixed_exact_pass':post['fixed_replay'].get('exact_pass'),
+            'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False}
+
+
 def main():
     probe = read("price_action_result_v1.json")
     fidelity = read("price_action_fidelity_verify_v2.json")
@@ -30,6 +67,7 @@ def main():
     for record in deep["results"]:
         stage = "REJECT_DEEP" if record.get("status") == "DEEP_REJECT" else "MANUAL_EVIDENCE_REVIEW"
         rows.append({"strategy_id": record["strategy_id"], "decision": stage, "replay_exact_pass": record.get("replay_exact_pass")})
+    rows.append(archived_survivor_decision())
     ids = [r["strategy_id"] for r in rows]
     if len(ids) != len(set(ids)):
         raise RuntimeError("DUPLICATE_STRATEGY_ID")
