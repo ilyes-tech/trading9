@@ -147,6 +147,9 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
         ))
         and runner.get('status') == 'SAFE_IDLE'
         and runner.get('search_executed') is False
+        and all(runner.get(key) is not True for key in (
+            'orders_allowed','mt5_allowed','holdout_allowed'
+        ))
     )
     if not safe:
         raise RuntimeError('SYNTHETIC_STOP_UNSAFE_SCIENTIFIC_STATE')
@@ -189,6 +192,14 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
     after = json.loads((state / 'search_authorization_v1.json').read_text())
     if after != auth:
         raise RuntimeError('SCIENTIFIC_GATE_CHANGED_DURING_TEST')
+    # Autonomous runner may wake during this synthetic cycle. Fail closed
+    # rather than claim engineering PASS if discovery/phase2 has started.
+    now_runner = json.loads((state / 'research_continuous_runner_v1.json').read_text())
+    if (now_runner.get('status')!='SAFE_IDLE'
+            or now_runner.get('search_executed') is not False
+            or any(now_runner.get(key) is True for key in (
+                'orders_allowed','mt5_allowed','holdout_allowed'))):
+        raise RuntimeError('RUNNER_STATE_CHANGED_DURING_TEST')
     return {
         'kind': 'OMEGA_SYNTHETIC_VERTICAL_CYCLE_V1',
         'status': 'ENGINEERING_PASS_NOT_SCIENTIFIC_ADMISSION',

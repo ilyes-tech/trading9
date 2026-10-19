@@ -116,6 +116,40 @@ def test_gate_change_during_synthetic_replay_fails_closed(tmp_path, monkeypatch)
 
 
 
+def test_runner_wake_during_synthetic_work_fails_closed(tmp_path,monkeypatch):
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    safe_state(tmp_path)
+    real=cycle.smoke.exercise
+
+    def concurrent_runner(*args,**kwargs):
+        value=real(*args,**kwargs)
+        path=tmp_path/'research_continuous_runner_v1.json'
+        doc=json.loads(path.read_text())
+        doc['status']='RESEARCH_CYCLE_COMPLETED'
+        doc['search_executed']=True
+        path.write_text(json.dumps(doc))
+        return value
+
+    monkeypatch.setattr(cycle.smoke,'exercise',concurrent_runner)
+    with pytest.raises(RuntimeError,match='RUNNER_STATE_CHANGED_DURING_TEST'):
+        guarded_synthetic_cycle(tmp_path)
+    assert not list(tmp_path.glob('*.sqlite3'))
+
+
+def test_unsafe_runner_permission_refused_before_replay(tmp_path,monkeypatch):
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    for flag in ('orders_allowed','mt5_allowed','holdout_allowed'):
+        safe_state(tmp_path)
+        runner=tmp_path/'research_continuous_runner_v1.json'
+        doc=json.loads(runner.read_text())
+        doc[flag]=True
+        runner.write_text(json.dumps(doc))
+        monkeypatch.setattr(cycle.smoke,'exercise',lambda *a,**k:
+                            (_ for _ in ()).throw(AssertionError('UNSAFE_REPLAY_STARTED')))
+        with pytest.raises(RuntimeError,match='SYNTHETIC_STOP_UNSAFE_SCIENTIFIC_STATE'):
+            guarded_synthetic_cycle(tmp_path)
+
+
 def test_shadow_failure_fails_closed_before_memory(tmp_path, monkeypatch):
     from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
     safe_state(tmp_path)
