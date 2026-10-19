@@ -22,6 +22,8 @@ def decide(inventory,queue,features,history,registry,feedback):
         elif fb.get('scientific_review_status') == 'REJECTED_EXISTING_FAMILY' and fb.get('next_step') == 'STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS':
             next_action='STOP_REJECTED_EXISTING_FLOW_HYPOTHESIS'
         elif not q['bar_data_present']:next_action='ACQUIRE_AND_VERIFY_MARKET_DATA'
+        elif not f['bar_imbalance_feature_schema_supported'] and f.get('price_bar_march_schema_supported') is True:
+            next_action='REVIEW_PRICE_BAR_HYPOTHESIS_AND_EXECUTABLE_BROKER_COSTS'
         elif not f['bar_imbalance_feature_schema_supported']:next_action='VERIFY_REQUIRED_FEATURE_SCHEMA'
         elif h.get('historical_trial_scope', 'HISTORY_UNAVAILABLE_OR_INVALID') == 'HISTORY_UNAVAILABLE_OR_INVALID':next_action='VERIFY_HISTORICAL_SEARCH_COVERAGE'
         elif isinstance(h.get('historical_trial_count'), int) and not isinstance(h.get('historical_trial_count'), bool) and h['historical_trial_count'] > 0:next_action='REVIEW_PRIOR_FLOW_TRIALS_AND_MECHANISM_DIFFERENCE'
