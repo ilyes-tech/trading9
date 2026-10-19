@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import math
+from datetime import datetime, timezone
 
 from hf_lab.replay import ReplaySettings, run_replay
 from pathlib import Path
@@ -84,28 +85,79 @@ def compare_cost_stress(base_db: Path, stress_db: Path, baseline_metrics: dict) 
     report=run_replay(symbol='BTCUSD',dataset='SYNTHETIC_STAGE04_COST_REVIEW_ONLY',
                       bars=smoke.synthetic_bars(),strategy=smoke.momentum_burst,
                       settings=stress,database_path=stress_db)
+    # Independent SQLite reconciliation: never accept summary fields on trust.
+    sql=("SELECT side,signal_time,entry_time,exit_time,gross_r,fee_r,"
+         "slippage_r,net_r FROM trades WHERE result!='OPEN' ORDER BY id")
     with sqlite3.connect(base_db) as db:
-        base=db.execute("SELECT side,signal_time,entry_time,exit_time,net_r "
-                        "FROM trades WHERE result!='OPEN' ORDER BY id").fetchall()
+        base=db.execute(sql).fetchall()
+    with sqlite3.connect(stress_db) as db:
+        stressed_rows=db.execute(sql).fetchall()
     stressed=list(report.trades)
-    if len(base)!=83 or len(stressed)!=83:
+    if len(base)!=83 or len(stressed)!=83 or len(stressed_rows)!=83:
         raise RuntimeError('STAGE04_TRADE_COUNT_CHANGED')
-    for initial,modified in zip(base,stressed,strict=True):
-        a_side,a_signal,a_entry,a_exit,a_net=initial
-        # SQLite datetimes are normalized strings by the replay writer.
+    def independently_reconcile(rows, expected):
+        net_values=[]
+        last_exit=None
+        for row in rows:
+            side, signal, entry, exit_, gross, fee, slip, net=row
+            if side not in ('BUY','SELL'):
+                raise RuntimeError('STAGE06_INVALID_TRADE_DIRECTION')
+            try:
+                times=[datetime.fromisoformat(x) for x in (signal,entry,exit_)]
+            except (TypeError,ValueError) as exc:
+                raise RuntimeError('STAGE06_INVALID_SYNTHETIC_TIMESTAMP') from exc
+            if (any(t.tzinfo is None or t.utcoffset()!=timezone.utc.utcoffset(t)
+                    for t in times)
+                    or not times[0]<times[1]<=times[2]
+                    or (last_exit is not None and times[1]<last_exit)):
+                raise RuntimeError('STAGE06_TEMPORAL_INTEGRITY_REJECT')
+            last_exit=times[2]
+            if (any(type(v) not in (int,float) or not math.isfinite(v)
+                    for v in (gross,fee,slip,net))
+                    or not math.isclose(net,gross-fee-slip,rel_tol=1e-10,abs_tol=1e-10)
+                    or fee<0 or slip<0):
+                raise RuntimeError('STAGE06_TRADE_ACCOUNTING_REJECT')
+            net_values.append(net)
+        wins=sum(v>0 for v in net_values)
+        gains=sum(max(0.0,v) for v in net_values)
+        losses=-sum(min(0.0,v) for v in net_values)
+        if not losses>0:
+            raise RuntimeError('STAGE06_PROFIT_FACTOR_UNREPORTABLE')
+        equity=peak=drawdown=0.0
+        for value in net_values:
+            equity+=value
+            peak=max(equity,peak)
+            drawdown=max(drawdown,peak-equity)
+        recalculated={'net_r':sum(net_values),
+                      'profit_factor':gains/losses,
+                      'trades':len(rows),'wins':wins,
+                      'losses':len(rows)-wins,
+                      'max_drawdown_r':drawdown}
+        for key,value in recalculated.items():
+            observed=expected[key] if isinstance(expected,dict) else getattr(expected,key)
+            if (type(observed) not in (int,float) or not math.isfinite(observed)
+                    or not math.isclose(observed,value,rel_tol=1e-10,abs_tol=1e-10)):
+                raise RuntimeError('STAGE06_INDEPENDENT_METRICS_MISMATCH_'+key.upper())
+        return recalculated
+    base_independent=independently_reconcile(base,baseline_metrics)
+    stress_independent=independently_reconcile(stressed_rows,report.metrics)
+    for initial,modified,persisted in zip(base,stressed,stressed_rows,strict=True):
+        # Causal timestamps, gross trade and fills must not change under costs.
+        a_side,a_signal,a_entry,a_exit,a_gross,a_fee,a_slip,a_net=initial
         actual=(modified.side,modified.signal_time.isoformat(),
                 modified.entry_time.isoformat(),modified.exit_time.isoformat())
         expected=(a_side,a_signal,a_entry,a_exit)
-        if actual!=expected or not math.isfinite(a_net) or not math.isfinite(modified.net_r):
+        if (actual!=expected or persisted[:4]!=expected
+                or not math.isclose(modified.net_r,persisted[-1],rel_tol=1e-10,abs_tol=1e-10)
+                or not math.isclose(a_gross,persisted[4],rel_tol=1e-10,abs_tol=1e-10)):
             raise RuntimeError('STAGE04_REPLAY_PATH_OR_NUMERIC_MISMATCH')
-        if modified.net_r>=a_net:
+        if persisted[-1]>=a_net or persisted[5]<a_fee or persisted[6]<a_slip:
             raise RuntimeError('STAGE04_HIGHER_COST_DID_NOT_REDUCE_NET_TRADE')
-    base_net=baseline_metrics['net_r']
-    stress_net=report.metrics.net_r
-    base_pf=baseline_metrics['profit_factor']
-    stress_pf=report.metrics.profit_factor
-    if (not all(math.isfinite(x) for x in (base_net,stress_net,base_pf,stress_pf))
-            or not base_net>0 or not stress_net<0 or not base_pf>1 or not 0<=stress_pf<1):
+    base_net=base_independent['net_r']
+    stress_net=stress_independent['net_r']
+    base_pf=base_independent['profit_factor']
+    stress_pf=stress_independent['profit_factor']
+    if not (base_net>0>stress_net and base_pf>1>stress_pf>=0):
         raise RuntimeError('STAGE04_COST_FRAGILITY_VETO_NOT_DEMONSTRATED')
     return {
         'kind':'OMEGA_STAGE04_SYNTHETIC_COST_STRESS_V1',
@@ -124,6 +176,9 @@ def compare_cost_stress(base_db: Path, stress_db: Path, baseline_metrics: dict) 
         'stressed_pf_synthetic':stress_pf,
         'path_identical':True,
         'every_trade_worsened':True,
+        'stage06_independent_sqlite_metrics_verified':True,
+        'stage06_temporal_integrity_verified':True,
+        'stage06_holdout_or_market_data_read':False,
         'decision':'REJECT_SYNTHETIC_COST_FRAGILITY',
         'improvement_claimed':False,
         'scientific_admission':False,

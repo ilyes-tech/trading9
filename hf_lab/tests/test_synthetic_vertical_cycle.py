@@ -31,6 +31,9 @@ def test_bounded_synthetic_vertical_replay_memory_reject_and_idempotency(tmp_pat
     assert cost['comparison_budget'] == 1
     assert cost['baseline_trades'] == cost['stressed_trades'] == 83
     assert cost['path_identical'] and cost['every_trade_worsened']
+    assert cost['stage06_independent_sqlite_metrics_verified'] is True
+    assert cost['stage06_temporal_integrity_verified'] is True
+    assert cost['stage06_holdout_or_market_data_read'] is False
     assert cost['baseline_net_r'] > 0 > cost['stressed_net_r']
     assert cost['baseline_pf_synthetic'] > 1 > cost['stressed_pf_synthetic']
     assert cost['improvement_claimed'] is False
@@ -222,6 +225,49 @@ def test_stage04_rejects_false_cost_robustness_or_unexpected_profit(tmp_path,mon
         return replace(out,metrics=metrics)
 
     monkeypatch.setattr(cycle,'run_replay',tampered)
-    with pytest.raises(RuntimeError,match='STAGE04_COST_FRAGILITY_VETO_NOT_DEMONSTRATED'):
+    with pytest.raises(RuntimeError,match='STAGE06_INDEPENDENT_METRICS_MISMATCH_NET_R'):
+        guarded_synthetic_cycle(tmp_path)
+    assert not list(tmp_path.glob('*.sqlite3'))
+
+
+def test_stage06_rejects_plausible_but_forged_stress_summary(tmp_path,monkeypatch):
+    from dataclasses import replace
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+
+    safe_state(tmp_path)
+    original=cycle.run_replay
+
+    def forge(*args,**kwargs):
+        report=original(*args,**kwargs)
+        # Still loss-making: this fake passed the old sign-only check.
+        return replace(report,metrics=replace(report.metrics,net_r=-9.9,
+                                               profit_factor=0.2))
+
+    monkeypatch.setattr(cycle,'run_replay',forge)
+    with pytest.raises(RuntimeError,match='STAGE06_INDEPENDENT_METRICS_MISMATCH'):
+        guarded_synthetic_cycle(tmp_path)
+
+
+@pytest.mark.parametrize('column,new_value,reason',[
+    ('net_r',100.0,'STAGE06_TRADE_ACCOUNTING_REJECT'),
+    ('entry_time','2026-01-01T22:00:00+00:00','STAGE06_TEMPORAL_INTEGRITY_REJECT'),
+])
+def test_stage06_rejects_falsified_stressed_sqlite_trades_before_memory(
+        tmp_path,monkeypatch,column,new_value,reason):
+    import sqlite3
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+
+    safe_state(tmp_path)
+    real=cycle.run_replay
+
+    def corrupted(*args,**kwargs):
+        report=real(*args,**kwargs)
+        with sqlite3.connect(kwargs['database_path']) as db:
+            db.execute(f'UPDATE trades SET {column}=? WHERE id=(SELECT MIN(id) FROM trades)',
+                       (new_value,))
+        return report
+
+    monkeypatch.setattr(cycle,'run_replay',corrupted)
+    with pytest.raises(RuntimeError,match=reason):
         guarded_synthetic_cycle(tmp_path)
     assert not list(tmp_path.glob('*.sqlite3'))
