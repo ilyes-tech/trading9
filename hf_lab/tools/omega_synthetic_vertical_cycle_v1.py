@@ -251,6 +251,59 @@ def inspect_synthetic_cross_market_timing() -> dict:
     }
 
 
+def select_synthetic_next_tools(cost_stress: dict, scratch: Path) -> dict:
+    """Run the existing advisory JARVIS selector in isolated synthetic state."""
+    if (cost_stress.get('decision') != 'REJECT_SYNTHETIC_COST_FRAGILITY'
+            or cost_stress.get('scientific_admission') is not False
+            or cost_stress.get('orders_allowed') is not False):
+        raise RuntimeError('STAGE08_UNTRUSTED_SYNTHETIC_DIAGNOSIS')
+    scratch.mkdir()
+    (scratch / 'reflection_v2.json').write_text(json.dumps({
+        'next_action':'REVIEW_KNOWN_COST_FRAGILITY',
+    }))
+    (scratch / 'failure_diagnosis_v2.json').write_text(json.dumps({
+        'status':'DIAGNOSED','reason':'SYNTHETIC_COST_FRAGILITY',
+    }))
+    target=(smoke.ROOT /
+        'research_agent_v57_quantum_searcher/tools/v57_jarvis/autonomy/v57_tool_selector_v1.py')
+    selector=runpy.run_path(str(target))['main']
+    selector.__globals__['S']=scratch
+    selector()
+    output=json.loads((scratch / 'tool_selection_v1.json').read_text())
+    chosen=output.get('selected')
+    catalog=output.get('catalog')
+    if not isinstance(catalog,dict) or chosen!=['DIAGNOSIS','CAUSAL_DESIGN']:
+        raise RuntimeError('STAGE08_WRONG_ADVISORY_TOOL_SELECTION')
+    try:
+        selected_cost=sum(catalog[t]['cost'] for t in chosen)
+        searcher_cost=catalog['SEARCHER']['cost']
+    except (KeyError,TypeError) as exc:
+        raise RuntimeError('STAGE08_COST_CATALOG_INVALID') from exc
+    if (selected_cost!=2 or searcher_cost!=8
+            or output.get('searcher_selected') is not False
+            or output.get('status')!='PASS'
+            or output.get('reason')!='KNOWN_FAILURE_USE_CHEAP_CAUSAL_TOOLS_FIRST'
+            or any(output.get(k) is not False for k in (
+                'orders_allowed','mt5_allowed','holdout_allowed'))
+            or any((scratch / n).exists() for n in (
+                'search_authorization_v1.json','search_execution_gate_v1.json'))):
+        raise RuntimeError('STAGE08_TOOL_SELECTION_OR_GUARDS_INVALID')
+    return {
+        'kind':'OMEGA_STAGE08_SYNTHETIC_TOOL_SELECTION_V1',
+        'status':'CHEAP_KNOWN_FAILURE_DIAGNOSIS_SELECTED_NOT_EXECUTED',
+        'selected':chosen,
+        'total_catalog_cost':selected_cost,
+        'searcher_catalog_cost':searcher_cost,
+        'saved_catalog_cost':searcher_cost-selected_cost,
+        'searcher_selected':False,
+        'diagnostic_execution_started':False,
+        'scientific_admission':False,
+        'orders_allowed':False,
+        'holdout_allowed':False,
+        'market_data_accessed':False,
+    }
+
+
 def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
     """Run one bounded fictitious replay then three deduplicated memory ticks."""
     if cycles != 3:
@@ -285,6 +338,7 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
         shadow_events = inspect_synthetic_shadow(baseline_db)
         cost_stress = compare_cost_stress(baseline_db,temp / 'stress_replay.sqlite3',diagnostic)
         cross_market = inspect_synthetic_cross_market_timing()
+        tool_plan = select_synthetic_next_tools(cost_stress,temp / 'tool_selection')
         evidence = temp / 'evidence'
         evidence.mkdir()
         (evidence / 'synthetic_reject.json').write_text(json.dumps({
@@ -330,6 +384,7 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
         'stage04_cost_stress':cost_stress,
         'stage04_comparison_executions':1,
         'stage07_cross_market_timing':cross_market,
+        'stage08_synthetic_next_tools':tool_plan,
         'closed_synthetic_trades': trades,
         'verified_synthetic_shadow_events': shadow_events,
         'synthetic_shadow_no_broker_adapter': True,

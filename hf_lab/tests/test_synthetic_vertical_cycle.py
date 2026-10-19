@@ -59,6 +59,16 @@ def test_bounded_synthetic_vertical_replay_memory_reject_and_idempotency(tmp_pat
     assert clock['performance_test_executed'] is False
     assert clock['historical_market_data_read'] is False
     assert clock['scientific_admission'] is False
+    advisory=result['stage08_synthetic_next_tools']
+    assert advisory['status']=='CHEAP_KNOWN_FAILURE_DIAGNOSIS_SELECTED_NOT_EXECUTED'
+    assert advisory['selected']==['DIAGNOSIS','CAUSAL_DESIGN']
+    assert advisory['total_catalog_cost']==2
+    assert advisory['searcher_catalog_cost']==8
+    assert advisory['saved_catalog_cost']==6
+    assert advisory['searcher_selected'] is False
+    assert advisory['diagnostic_execution_started'] is False
+    assert all(advisory[k] is False for k in (
+        'orders_allowed','holdout_allowed','market_data_accessed','scientific_admission'))
     assert result['dedup_replay_skips'] == 2
     assert all(result[key] is False for key in (
         'market_data_accessed', 'production_learning_memory_modified',
@@ -334,3 +344,39 @@ def test_stage07_missing_first_past_clock_fails_closed(tmp_path,monkeypatch):
     monkeypatch.setattr(cycle,'causal_signal_clocks',missing_first)
     with pytest.raises(RuntimeError,match='STAGE07_FUTURE_LABEL_LEAKAGE_OR_CLOCK_MISMATCH'):
         guarded_synthetic_cycle(tmp_path)
+
+
+def test_stage08_refuses_forged_expensive_tool_selection(tmp_path,monkeypatch):
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    safe_state(tmp_path)
+    original=cycle.runpy.run_path
+
+    def forged_selector():
+        directory=forged_selector.__globals__['S']
+        out={'status':'PASS','selected':['SEARCHER'],
+             'catalog':{'SEARCHER':{'cost':8}},
+             'searcher_selected':True,
+             'orders_allowed':False,'mt5_allowed':False,'holdout_allowed':False}
+        (directory/'tool_selection_v1.json').write_text(json.dumps(out))
+
+    def fake_run_path(path):
+        if str(path).endswith('v57_tool_selector_v1.py'):
+            return {'main':forged_selector}
+        return original(path)
+
+    monkeypatch.setattr(cycle.runpy,'run_path',fake_run_path)
+    with pytest.raises(RuntimeError,match='STAGE08_WRONG_ADVISORY_TOOL_SELECTION'):
+        guarded_synthetic_cycle(tmp_path)
+    assert not list(tmp_path.glob('*.sqlite3'))
+
+
+def test_stage08_untrusted_cost_verdict_stops_before_tool_selection(tmp_path):
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    for forged in ({'decision':'PROMOTE_SYNTHETIC'},
+                   {'decision':'REJECT_SYNTHETIC_COST_FRAGILITY',
+                    'scientific_admission':True,'orders_allowed':False},
+                   {'decision':'REJECT_SYNTHETIC_COST_FRAGILITY',
+                    'scientific_admission':False,'orders_allowed':True}):
+        with pytest.raises(RuntimeError,match='STAGE08_UNTRUSTED_SYNTHETIC_DIAGNOSIS'):
+            cycle.select_synthetic_next_tools(forged,tmp_path/'must_not_exist')
+        assert not (tmp_path/'must_not_exist').exists()
