@@ -43,6 +43,11 @@ def test_empty_quote_export_cannot_claim_completion():
     assert 'if(rows == 0)' in data
     assert 'NO_VALID_QUOTES_HEADER_ONLY_EXPORT_NOT_EVIDENCE' in data
     assert data.index('if(rows == 0)') < data.index('OMEGA_READONLY_EXPORT_COMPLETED_BUT_NOT_COST_VERIFIED')
+    assert 'FileDelete(export_name)' in data
+    assert 'EMPTY_EXPORT_CLEANUP_FAILED_MANUAL_CHECK_REQUIRED' in data
+    assert data.index('FileClose(output)') < data.index('if(rows == 0)')
+    assert data.index('if(rows == 0)') < data.index('FileDelete(export_name)')
+    assert data.index('FileDelete(export_name)') < data.index('OMEGA_READONLY_EXPORT_COMPLETED_BUT_NOT_COST_VERIFIED')
 
 
 def test_export_rejects_stale_or_future_mt5_quote_and_retains_tick_time():

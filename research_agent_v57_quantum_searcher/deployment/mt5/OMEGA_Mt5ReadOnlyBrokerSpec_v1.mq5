@@ -117,6 +117,10 @@ void OnStart()
    FileClose(output);
    if(rows == 0)
    {
+      // This file was just created by THIS run; no previous export is touched.
+      // Removing the invalid header-only snapshot permits a later retry.
+      if(!FileDelete(export_name))
+         Print("OMEGA_STOP: EMPTY_EXPORT_CLEANUP_FAILED_MANUAL_CHECK_REQUIRED");
       Print("OMEGA_STOP: NO_VALID_QUOTES_HEADER_ONLY_EXPORT_NOT_EVIDENCE");
       return;
    }
