@@ -42,6 +42,10 @@ def test_bounded_synthetic_vertical_replay_memory_reject_and_idempotency(tmp_pat
     assert result['closed_synthetic_trades'] == 83
     assert result['verified_synthetic_shadow_events'] == 83
     assert result['synthetic_shadow_no_broker_adapter'] is True
+    assert result['stage09_synthetic_twin_events'] == 83
+    assert result['stage09_synthetic_twin_parity_verified'] is True
+    assert result['stage09_synthetic_twin_fault_injections_rejected'] == 2
+    assert result['stage09_actual_broker_feed_used'] is False
     assert result['learning_ticks_inserted'] == [1, 0, 0]
     assert result['learned_observations'] == 1
     assert result['stage04_learning_decision'] == 'REJECT'
@@ -380,3 +384,32 @@ def test_stage08_untrusted_cost_verdict_stops_before_tool_selection(tmp_path):
         with pytest.raises(RuntimeError,match='STAGE08_UNTRUSTED_SYNTHETIC_DIAGNOSIS'):
             cycle.select_synthetic_next_tools(forged,tmp_path/'must_not_exist')
         assert not (tmp_path/'must_not_exist').exists()
+
+
+@pytest.mark.parametrize('fault', ['FORGED_MISMATCH_PASS','FALSE_GOOD_PARITY'])
+def test_stage09_rejects_fake_twin_claims_before_learning(tmp_path,monkeypatch,fault):
+    from hf_lab.tools import omega_synthetic_vertical_cycle_v1 as cycle
+    safe_state(tmp_path)
+    original=cycle.runpy.run_path
+
+    def altered_source(path):
+        doc=original(path)
+        if str(path).endswith('v57_execution_core_v1.py'):
+            twin=doc['digital_twin']
+            def falsify(expected,observed):
+                result=twin(expected,observed)
+                if fault=='FORGED_MISMATCH_PASS' and result['status']=='DIVERGENCE':
+                    return {'status':'PARITY','events':len(expected),'promotion_allowed':False}
+                if fault=='FALSE_GOOD_PARITY' and result['status']=='PARITY':
+                    return {'status':'DIVERGENCE','promotion_allowed':False}
+                return result
+            doc['digital_twin']=falsify
+        return doc
+
+    monkeypatch.setattr(cycle.runpy,'run_path',altered_source)
+    expected_error=('STAGE09_SYNTHETIC_TWIN_FAILURE_INJECTION_NOT_CAUGHT'
+                    if fault=='FORGED_MISMATCH_PASS'
+                    else 'STAGE09_SYNTHETIC_TWIN_PARITY_FAILED')
+    with pytest.raises(RuntimeError,match=expected_error):
+        guarded_synthetic_cycle(tmp_path)
+    assert not list(tmp_path.glob('*.sqlite3'))

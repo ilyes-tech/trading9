@@ -42,6 +42,8 @@ def inspect_synthetic_shadow(replay_db: Path) -> int:
     if len(rows) != 83:
         raise RuntimeError('SYNTHETIC_SHADOW_TRADE_COUNT_CHANGED')
     ids = set()
+    expected_events = []
+    observed_events = []
     dedup = execution['Deduplicator']()
     for trade_id, side, timestamp, entry, stop, target in rows:
         event = shadow['ShadowEvent'](
@@ -73,6 +75,25 @@ def inspect_synthetic_shadow(replay_db: Path) -> int:
                 or not dedup.accept(intent)
                 or dedup.accept(intent)):
             raise RuntimeError('SYNTHETIC_INTENT_REJECTED_OR_DUPLICATED')
+        expected_events.append(dict(
+            symbol='SYNTHETIC_NOT_MARKET',side=side,volume=0.01,
+            entry=entry,sl=stop,tp=target))
+        observed_events.append(dict(expected_events[-1]))
+    twin = execution['digital_twin'](expected_events,observed_events)
+    if (twin.get('status') != 'PARITY'
+            or twin.get('events') != 83
+            or twin.get('promotion_allowed') is not False):
+        raise RuntimeError('STAGE09_SYNTHETIC_TWIN_PARITY_FAILED')
+    mismatched=[dict(row) for row in observed_events]
+    mismatched[5]['entry']+=0.5
+    broken=execution['digital_twin'](expected_events,mismatched)
+    missing=execution['digital_twin'](expected_events,observed_events[:-1])
+    if (broken.get('status')!='DIVERGENCE'
+            or broken.get('first_divergence')!=5
+            or broken.get('promotion_allowed') is not False
+            or missing.get('status')!='DIVERGENCE'
+            or missing.get('promotion_allowed') is not False):
+        raise RuntimeError('STAGE09_SYNTHETIC_TWIN_FAILURE_INJECTION_NOT_CAUGHT')
     health = monitor['assess'](monitor['Health'](
         data_age_s=1, heartbeat_age_s=1, execution_divergences=0,
         drawdown=0.01, expected_trade_rate=10, observed_trade_rate=10,
@@ -388,6 +409,10 @@ def guarded_synthetic_cycle(state: Path, *, cycles: int = 3) -> dict:
         'closed_synthetic_trades': trades,
         'verified_synthetic_shadow_events': shadow_events,
         'synthetic_shadow_no_broker_adapter': True,
+        'stage09_synthetic_twin_events':shadow_events,
+        'stage09_synthetic_twin_parity_verified':True,
+        'stage09_synthetic_twin_fault_injections_rejected':2,
+        'stage09_actual_broker_feed_used':False,
         'learning_ticks_inserted': [a for a, _ in ticks],
         'learned_observations': ticks[-1][1],
         'stage04_learning_decision':decisions[0][0],
